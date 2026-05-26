@@ -1,0 +1,2916 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Validation Interview Tool — Reactions + Heatmap</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #f4f5f7;
+    --panel: #ffffff;
+    --text: #1b1d22;
+    --muted: #6b6f76;
+    --border: #e3e6ea;
+    --soft: #f8f9fb;
+    --accent: #1a1a1a;
+    --shadow: 0 4px 16px rgba(20,20,30,0.06);
+    --love-bg: #ffe4e7;
+    --love-c:  #c62828;
+    --like-bg: #e6f4ea;
+    --like-c:  #2e7d32;
+    --dis-bg:  #fdecea;
+    --dis-c:   #b71c1c;
+
+    --hm--3: #b71c1c;
+    --hm--2: #d32f2f;
+    --hm--1: #ef9a9a;
+    --hm-0:  #f1f3f5;
+    --hm-1:  #c8e6c9;
+    --hm-2:  #66bb6a;
+    --hm-3:  #1b5e20;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.4;
+    font-size: 14px;
+  }
+  .container { max-width: 1180px; margin: 0 auto; padding: 18px 16px 60px; }
+
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .topbar-title { font-weight: 700; font-size: 16px; color: var(--muted); letter-spacing: 0.3px; }
+  .topbar-right { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--panel);
+    padding: 6px;
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+    overflow-x: auto;
+  }
+  .tab {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 14px;
+    white-space: nowrap;
+  }
+  .tab.active { background: var(--accent); color: white; }
+  .tab:hover:not(.active) { background: var(--soft); color: var(--text); }
+
+  .panel {
+    background: var(--panel);
+    border-radius: 12px;
+    padding: 18px;
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+  }
+
+  .btn {
+    padding: 8px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: white;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text);
+    transition: background 0.12s ease;
+  }
+  .btn:hover { background: var(--soft); }
+  .btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .btn.primary:hover { background: #333; }
+  .btn.danger { color: #c62828; border-color: #f3c4c4; }
+  .btn.danger:hover { background: #fdecea; }
+  .btn.tiny { padding: 4px 8px; font-size: 12px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  select, input[type="text"], textarea {
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    background: white;
+    color: var(--text);
+  }
+  select:focus, input:focus, textarea:focus { outline: 2px solid #d6e4ff; border-color: #4a90e2; }
+  textarea { resize: vertical; }
+  label.field-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 4px;
+  }
+
+  /* INTERVIEWER VIEW */
+  .ctx-bar {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 14px;
+    align-items: end;
+  }
+  .ctx-bar > div { min-width: 0; }
+  .slide-card {
+    border-radius: 12px;
+    padding: 22px;
+    background: var(--panel);
+    box-shadow: var(--shadow);
+    margin-bottom: 14px;
+    border-top: 6px solid var(--slide-accent, #888);
+  }
+  .slide-card h2.headline { margin: 0 0 10px; font-size: 22px; line-height: 1.25; color: var(--slide-accent); font-weight: 800; }
+  .statement-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    margin-bottom: 7px;
+    background: var(--soft);
+    align-items: start;
+  }
+  .statement-row.has-reaction { background: white; border-color: #c9d3df; }
+  .statement-row .stmt {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+  }
+  .statement-row .stmt-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .stmt-label {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: white;
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 10px;
+    flex-shrink: 0;
+  }
+  .stmt-text { font-size: 14px; line-height: 1.45; }
+  .stmt-text.is-headline { font-weight: 700; font-size: 15px; }
+  .stmt-text.is-quote { font-style: italic; font-weight: 600; }
+  .stmt-text.is-promise { font-style: italic; }
+  .stmt-text.is-price { font-weight: 600; }
+  .phrase-input {
+    width: 100%;
+    padding: 6px 10px;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    color: var(--muted);
+    background: white;
+  }
+  .phrase-input:focus { color: var(--text); border-style: solid; }
+  .reaction-buttons { display: flex; gap: 4px; flex-shrink: 0; }
+  .rxn-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: white;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.12s ease;
+    padding: 0;
+  }
+  .rxn-btn:hover { transform: scale(1.08); }
+  .rxn-btn.active.love {    background: var(--love-bg); border-color: var(--love-c); }
+  .rxn-btn.active.like {    background: var(--like-bg); border-color: var(--like-c); }
+  .rxn-btn.active.dislike { background: var(--dis-bg);  border-color: var(--dis-c); }
+  .rxn-btn.active { transform: scale(1.1); }
+
+  .slide-nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    margin-bottom: 12px;
+    padding: 4px;
+    background: var(--panel);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+  }
+  .slide-pill {
+    padding: 8px 14px;
+    border-radius: 7px;
+    border: 2px solid transparent;
+    background: transparent;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    color: var(--muted);
+  }
+  .slide-pill.active { background: var(--soft); color: var(--text); border-color: var(--slide-accent, #ccc); }
+  .slide-pill:hover { background: var(--soft); }
+  .slide-pill .progress {
+    margin-left: 6px;
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: #e9ecef;
+    color: var(--muted);
+  }
+  .slide-pill.active .progress { background: var(--slide-accent, #ccc); color: white; }
+
+  .footer-actions {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .interview-toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+    padding-top: 12px;
+    border-top: 1px dashed var(--border);
+  }
+
+  /* HEATMAP */
+  .heatmap-controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  .heatmap-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: var(--shadow); background: white; }
+  table.heatmap {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 720px;
+    font-size: 13px;
+  }
+  table.heatmap th, table.heatmap td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  table.heatmap thead th {
+    background: #f7f8fa;
+    color: var(--text);
+    font-weight: 700;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  table.heatmap td.label {
+    text-align: left;
+    background: var(--soft);
+    font-weight: 500;
+    min-width: 240px;
+    max-width: 380px;
+  }
+  table.heatmap td.label .small-label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--muted);
+    letter-spacing: 0.4px;
+    display: block;
+    margin-bottom: 2px;
+  }
+  table.heatmap tr.slide-divider td {
+    background: var(--slide-accent, #555);
+    color: white;
+    font-weight: 700;
+    text-align: left;
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+  table.heatmap td.score-cell {
+    cursor: pointer;
+    font-weight: 700;
+    width: 80px;
+    position: relative;
+  }
+  table.heatmap td.score-cell .emoji { font-size: 16px; display: block; line-height: 1; }
+  table.heatmap td.score-cell .score-num { font-size: 11px; opacity: 0.8; display: block; margin-top: 2px; }
+  table.heatmap td.score-cell.has-phrase::after {
+    content: "•";
+    position: absolute;
+    top: 2px;
+    right: 4px;
+    color: rgba(0,0,0,0.5);
+    font-weight: 700;
+  }
+  table.heatmap td.total-cell { font-weight: 700; background: #fafbfc; min-width: 60px; }
+  table.heatmap tr.totals-row td { font-weight: 700; background: #eef0f3; }
+  table.heatmap tr.totals-row td.label { background: #e0e3e8; }
+
+  .legend {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .legend-swatch {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-weight: 600;
+    color: white;
+  }
+  .legend-swatch.n { color: var(--text); }
+
+  /* EDIT VIEW */
+  .edit-slide {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    border-left: 6px solid var(--slide-accent, #888);
+  }
+  .edit-slide-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .edit-slide-title { font-weight: 700; font-size: 15px; color: var(--slide-accent); }
+  .edit-stmt-row {
+    display: grid;
+    grid-template-columns: 110px 130px 1fr auto;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .edit-stmt-row select, .edit-stmt-row input { font-size: 13px; }
+  .edit-stmt-row input { width: 100%; }
+  .edit-field-group {
+    display: grid;
+    grid-template-columns: 130px 1fr;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .edit-field-group label { font-size: 12px; font-weight: 600; color: var(--muted); }
+  .edit-field-group input[type="color"] { padding: 0; height: 32px; width: 60px; border-radius: 6px; cursor: pointer; }
+
+  .participant-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  .participant-row input { flex: 1; }
+
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: #1a1a1a;
+    color: white;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    opacity: 0;
+    transition: all 0.25s ease;
+    pointer-events: none;
+    z-index: 100;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  .modal-back {
+    position: fixed;
+    inset: 0;
+    background: rgba(20,22,28,0.55);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 50;
+    padding: 20px;
+  }
+  .modal-back.show { display: flex; }
+  .modal {
+    background: white;
+    padding: 22px;
+    border-radius: 12px;
+    max-width: 580px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal h3 { margin-top: 0; }
+
+  /* ============ PARTICIPANT VIEW ============ */
+  body.participant-mode { background: #fafbfc; }
+  .participant-shell {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 20px 16px 80px;
+  }
+  .pp-welcome {
+    background: white;
+    border-radius: 14px;
+    padding: 28px;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+  .pp-welcome h1 {
+    margin: 0 0 8px;
+    font-size: 26px;
+  }
+  .pp-welcome p {
+    color: var(--muted);
+    margin: 0 0 20px;
+    line-height: 1.5;
+  }
+  .pp-welcome input {
+    width: 100%;
+    max-width: 320px;
+    padding: 10px 14px;
+    font-size: 16px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 16px;
+  }
+  .pp-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 18px;
+    font-size: 13px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .pp-dots { display: flex; gap: 6px; }
+  .pp-dot { width: 9px; height: 9px; border-radius: 50%; background: #cfd4da; }
+  .pp-dot.done { background: #7fc88f; }
+  .pp-dot.active { background: var(--text); }
+
+  .pp-slide {
+    background: white;
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    padding: 28px 28px 18px;
+    border-top: 8px solid var(--slide-accent, #888);
+  }
+  .pp-slide h2 {
+    color: var(--slide-accent);
+    font-size: 28px;
+    line-height: 1.2;
+    margin: 0 0 16px;
+    font-weight: 800;
+  }
+  .pp-stmt {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .pp-stmt.has-reaction { background: white; border-color: #b8c2cf; }
+  .pp-stmt-text { flex: 1; font-size: 16px; line-height: 1.45; min-width: 180px; }
+  .pp-stmt-text.is-headline { font-weight: 700; }
+  .pp-stmt-text.is-quote    { font-style: italic; font-weight: 600; }
+  .pp-stmt-text.is-promise  { font-style: italic; }
+  .pp-stmt-text.is-price    { font-weight: 600; }
+  .pp-rxn { display: flex; gap: 6px; }
+  .pp-rxn button {
+    width: 50px;
+    height: 50px;
+    font-size: 22px;
+    border-radius: 12px;
+    border: 2px solid var(--border);
+    background: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: all 0.12s ease;
+  }
+  .pp-rxn button:hover { transform: scale(1.06); }
+  .pp-rxn button.active.love    { background: var(--love-bg); border-color: var(--love-c); transform: scale(1.1); }
+  .pp-rxn button.active.like    { background: var(--like-bg); border-color: var(--like-c); transform: scale(1.1); }
+  .pp-rxn button.active.dislike { background: var(--dis-bg);  border-color: var(--dis-c); transform: scale(1.1); }
+
+  .pp-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 18px;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .pp-nav button {
+    padding: 12px 22px;
+    font-size: 15px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: white;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .pp-nav button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  .pp-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .pp-done-screen {
+    background: white;
+    border-radius: 14px;
+    padding: 32px;
+    box-shadow: var(--shadow);
+    text-align: center;
+  }
+  .pp-done-screen h2 { margin: 0 0 10px; }
+  .pp-done-screen .code-box {
+    background: #f6f7f9;
+    border: 1px solid var(--border);
+    padding: 14px;
+    border-radius: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 12px;
+    word-break: break-all;
+    text-align: left;
+    margin: 16px 0;
+    max-height: 180px;
+    overflow-y: auto;
+  }
+
+  @media (max-width: 720px) {
+    .ctx-bar { grid-template-columns: 1fr; }
+    .statement-row { grid-template-columns: 1fr; }
+    .edit-stmt-row { grid-template-columns: 1fr; }
+    .pp-slide { padding: 20px 18px 14px; }
+    .pp-slide h2 { font-size: 22px; }
+    .pp-stmt { flex-direction: column; align-items: stretch; padding: 14px 14px 16px; }
+    .pp-stmt-text { font-size: 17px; line-height: 1.45; }
+    .pp-rxn { justify-content: space-between; gap: 8px; margin-top: 4px; }
+    .pp-rxn button { width: 60px; height: 60px; font-size: 26px; flex: 1; max-width: 90px; }
+    .pp-nav button { padding: 14px 18px; font-size: 16px; flex: 1; }
+    .participant-shell { padding: 14px 12px 80px; }
+    .pp-welcome { padding: 22px 18px; }
+    .pp-welcome h1 { font-size: 24px; }
+    .pp-welcome input { font-size: 16px; }  /* prevents iOS zoom on focus */
+  }
+
+  /* ============ PRINT / PDF ============ */
+  @media print {
+    @page { size: landscape; margin: 14mm 10mm; }
+    body { background: white !important; }
+    .container { max-width: 100% !important; padding: 0 !important; }
+    .topbar, .tabs, .modal-back, .toast,
+    #view-interview, #view-share, #view-edit, #view-participants, #view-export,
+    #participant-ui, .heatmap-controls { display: none !important; }
+    #view-heatmap { display: block !important; }
+    #view-heatmap .panel { box-shadow: none !important; padding: 0 !important; margin: 0 !important; background: white !important; }
+    .print-header { display: block !important; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid #1a1a1a; }
+    .print-header h1 { margin: 0 0 4px; font-size: 18pt; }
+    .print-header .meta { font-size: 10pt; color: #555; line-height: 1.6; }
+    .heatmap-table-wrap { overflow: visible !important; box-shadow: none !important; border-radius: 0 !important; }
+    table.heatmap { font-size: 9pt; page-break-inside: auto; }
+    table.heatmap th, table.heatmap td { padding: 4px 6px; }
+    table.heatmap thead { display: table-header-group; }
+    table.heatmap tr { page-break-inside: avoid; }
+    table.heatmap td.label { max-width: 320px; }
+    .legend { font-size: 9pt; margin-top: 10px; }
+    .print-notes { display: block !important; margin-top: 18px; page-break-inside: avoid; font-size: 9pt; }
+    .print-notes h3 { font-size: 11pt; margin: 0 0 6px; }
+    .print-notes .note-row { padding: 4px 0; border-bottom: 1px solid #eee; }
+    .print-notes .note-row strong { color: #555; font-weight: 600; }
+    * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
+  .print-header, .print-notes { display: none; }
+</style>
+</head>
+<body>
+
+<!-- ============ INTERVIEWER UI ============ -->
+<div class="container" id="interviewer-ui">
+
+  <div class="topbar">
+    <div class="topbar-title">VALIDATION INTERVIEW TOOL · interviewer side</div>
+    <div class="topbar-right">
+      <label class="field-label" style="margin:0">Cycle:</label>
+      <select id="cycle-select"></select>
+      <button class="btn tiny" id="add-cycle">+ New cycle</button>
+      <button class="btn tiny" id="rename-cycle">Rename</button>
+      <button class="btn tiny danger" id="delete-cycle">Delete</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" data-view="interview">🎤 Interview</button>
+    <button class="tab" data-view="heatmap">🔥 Heatmap</button>
+    <button class="tab" data-view="share">🔗 Share with participant</button>
+    <button class="tab" data-view="edit">✏️ Edit slides</button>
+    <button class="tab" data-view="participants">👥 Participants</button>
+    <button class="tab" data-view="export">📤 Export / Backup</button>
+  </div>
+
+  <!-- ============ INTERVIEW TAB ============ -->
+  <div id="view-interview">
+    <div class="panel">
+      <div class="ctx-bar">
+        <div>
+          <label class="field-label">Capturing notes for</label>
+          <select id="participant-select"></select>
+        </div>
+        <div>
+          <label class="field-label">Interviewee real name (optional)</label>
+          <input type="text" id="participant-name-input" placeholder="e.g. Marcus — Que & A BBQ" />
+        </div>
+        <div>
+          <button class="btn tiny" id="manage-pp">Manage participants</button>
+        </div>
+      </div>
+      <div class="interview-toolbar">
+        <button class="btn tiny" id="quick-share-link">🔗 Generate participant link</button>
+        <button class="btn tiny" id="quick-import-code">📥 Import reactions code from participant</button>
+        <span style="color:var(--muted);font-size:12px;align-self:center">
+          Participant reactions land in the <strong>currently selected participant</strong> slot above.
+        </span>
+      </div>
+    </div>
+
+    <div class="slide-nav" id="interview-nav"></div>
+    <div id="slide-container"></div>
+
+    <div class="footer-actions">
+      <button class="btn" id="prev-slide">← Previous slide</button>
+      <button class="btn primary" id="next-slide">Next slide →</button>
+    </div>
+  </div>
+
+  <!-- ============ HEATMAP TAB ============ -->
+  <div id="view-heatmap" style="display:none">
+    <div class="panel">
+      <div class="heatmap-controls">
+        <div>
+          <label class="field-label">Score mapping</label>
+          <span style="display:inline-flex;gap:8px;align-items:center;font-size:13px">
+            ❤️ = <input type="number" id="score-love" style="width:54px" min="-9" max="9" />
+            👍 = <input type="number" id="score-like" style="width:54px" min="-9" max="9" />
+            👎 = <input type="number" id="score-dislike" style="width:54px" min="-9" max="9" />
+          </span>
+        </div>
+        <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+          <div>
+            <label class="field-label" style="margin:0 0 2px">PDF includes</label>
+            <select id="pdf-participant-filter" style="font-size:12px"></select>
+          </div>
+          <button class="btn primary" id="hm-export-pdf">📄 Download PDF</button>
+          <button class="btn tiny" id="hm-export-csv">Download CSV</button>
+        </div>
+      </div>
+      <div class="print-header" id="print-header"></div>
+      <div class="heatmap-table-wrap">
+        <table class="heatmap" id="heatmap-table"></table>
+      </div>
+      <div class="legend" id="heatmap-legend"></div>
+      <div class="print-notes" id="print-notes"></div>
+    </div>
+  </div>
+
+  <!-- ============ SHARE TAB ============ -->
+  <div id="view-share" style="display:none">
+    <div class="panel">
+      <h3 style="margin-top:0">Share this cycle's slides with a participant</h3>
+      <div id="hosting-banner" style="display:none;background:#fff8e1;border:1px solid #f1c40f;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;line-height:1.5">
+        <strong>Heads-up:</strong> You opened this file directly from your hard drive (a <code>file://</code> URL). The "generate link" option below won't work for someone on a different device — they can't reach a file on your computer. <strong>Use "Download standalone participant file" instead</strong> — it produces a small HTML file you can email or text. Or, for the easiest path of all, use the same-device option.
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+
+        <div class="panel" style="margin:0;background:var(--soft)">
+          <h4 style="margin-top:0">📱 Option 1 · Send to their phone (best for mobile interviews)</h4>
+          <p style="font-size:13px;color:var(--muted)">Generates a link with the slides embedded and opens your device's share sheet so you can text, WhatsApp, iMessage, or email it straight to the participant. They tap the link on their phone, react, and send the reactions back the same way.</p>
+          <button class="btn primary" id="share-link-btn" style="width:100%;margin-bottom:6px">📤 Share participant link…</button>
+          <button class="btn" id="generate-link-btn" style="width:100%;font-size:12px">Or just show me the URL to copy</button>
+          <textarea id="generated-link-output" rows="2" placeholder="(Click above to generate)" style="width:100%;margin-top:6px;font-size:11px;font-family:ui-monospace,Menlo,monospace"></textarea>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+            <button class="btn tiny" id="copy-generated-link-btn" disabled>📋 Copy</button>
+            <span id="link-length-info" style="font-size:11px;color:var(--muted);margin-left:auto"></span>
+          </div>
+          <p id="link-warning" style="display:none;font-size:12px;color:#b71c1c;margin-top:6px"></p>
+        </div>
+
+        <div class="panel" style="margin:0;background:var(--soft)">
+          <h4 style="margin-top:0">🤝 Option 2 · Same device (in person)</h4>
+          <p style="font-size:13px;color:var(--muted)">You hand them your laptop, tablet, or phone. Reactions auto-sync to the selected slot — when they hand it back, the heatmap is already filled in.</p>
+          <label class="field-label">Participant slot</label>
+          <select id="share-pp-target" style="width:100%;margin-bottom:10px"></select>
+          <button class="btn primary" id="open-participant-view" style="width:100%">Open participant view in this tab →</button>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">Use your browser's <em>Back</em> button when they're done to flip back to your interviewer view.</p>
+        </div>
+
+      </div>
+
+      <details style="margin-top:14px">
+        <summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:13px">Advanced · Standalone HTML file (for offline / no hosting)</summary>
+        <div class="panel" style="margin-top:8px;background:var(--soft)">
+          <p style="font-size:13px;color:var(--muted)">Generates a tiny self-contained HTML file you can email as an attachment. The participant opens it locally on their phone or computer — no internet needed. Useful if you're sharing this with someone who can't open links.</p>
+          <button class="btn" id="generate-standalone-btn" style="width:100%">⬇ Download standalone participant file</button>
+        </div>
+      </details>
+
+      <div class="panel" style="margin-top:14px;background:var(--soft)">
+        <h4 style="margin-top:0">📥 Import reactions from a participant</h4>
+        <p style="font-size:13px;color:var(--muted)">When the participant hits Submit on their side, they'll get a code (starting with <code>RXN-</code>) or a JSON file. Paste/upload it here and choose which slot to assign it to.</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div>
+            <label class="field-label">Paste reactions code</label>
+            <textarea id="import-code-input" rows="4" placeholder="RXN-…" style="width:100%;font-family:ui-monospace,Menlo,monospace;font-size:12px"></textarea>
+          </div>
+          <div>
+            <label class="field-label">Or upload JSON file</label>
+            <input type="file" id="import-file" accept=".json,application/json" />
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:end;margin-top:10px;flex-wrap:wrap">
+          <div>
+            <label class="field-label">Assign to participant slot</label>
+            <select id="import-target-pp"></select>
+          </div>
+          <button class="btn primary" id="import-confirm">Import reactions</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ EDIT TAB ============ -->
+  <div id="view-edit" style="display:none">
+    <div class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <h3 style="margin:0">Edit slides for this cycle</h3>
+        <div style="display:flex;gap:6px">
+          <button class="btn" id="copy-from-cycle">Copy slides from another cycle…</button>
+          <button class="btn primary" id="add-slide">+ Add new slide</button>
+        </div>
+      </div>
+      <div id="edit-slides-container"></div>
+    </div>
+  </div>
+
+  <!-- ============ PARTICIPANTS TAB ============ -->
+  <div id="view-participants" style="display:none">
+    <div class="panel">
+      <h3 style="margin-top:0">Participants for this cycle</h3>
+      <p style="color:var(--muted);font-size:13px">Each participant becomes a column in the heatmap.</p>
+      <div id="participants-list"></div>
+      <button class="btn primary" id="add-participant" style="margin-top:8px">+ Add participant</button>
+    </div>
+  </div>
+
+  <!-- ============ EXPORT TAB ============ -->
+  <div id="view-export" style="display:none">
+    <div class="panel">
+      <h3 style="margin-top:0">Export &amp; Backup</h3>
+      <p style="color:var(--muted);font-size:13px">Everything you've entered lives in your browser. Export it before clearing browser data, or to share with a collaborator.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+        <button class="btn primary" id="export-json">Download full backup (.json)</button>
+        <button class="btn" id="export-csv-current">Download current cycle (.csv)</button>
+        <button class="btn" id="export-summary-current">Download interview summary (.txt)</button>
+        <button class="btn" id="import-json">Import backup (.json)…</button>
+        <input type="file" id="import-file-input" accept=".json,application/json" style="display:none" />
+      </div>
+      <h4 style="margin-bottom:6px">Reset</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn danger" id="reset-cycle-reactions">Clear reactions in this cycle</button>
+        <button class="btn danger" id="reset-everything">Wipe everything &amp; restore defaults</button>
+      </div>
+      <h4 style="margin-top:18px;margin-bottom:6px">Live preview of summary</h4>
+      <pre id="export-preview" style="background:var(--soft);padding:12px;border-radius:8px;font-size:12px;max-height:280px;overflow:auto;white-space:pre-wrap"></pre>
+    </div>
+  </div>
+
+</div>
+
+<!-- ============ PARTICIPANT UI ============ -->
+<div class="participant-shell" id="participant-ui" style="display:none"></div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-back" id="modal-back">
+  <div class="modal" id="modal-body"></div>
+</div>
+
+<script>
+/* ============================================================
+   STORAGE
+   ============================================================ */
+const STORAGE_KEY = 'validation-tool-v3';
+const PP_STORAGE_KEY = 'validation-tool-pp-session-v1';
+const DEFAULT_SCORE_MAP = { love: 3, like: 1, dislike: -1 };
+
+/* ============================================================
+   CLOUD SYNC + ACCOUNTS (Supabase)
+   ------------------------------------------------------------
+   To make this tool multi-user, paste your Supabase project's
+   URL and anon (public) key below. Until you do, the tool runs
+   in LOCAL-ONLY mode: data stays in this browser and there is
+   no sign-in (exactly how it worked before).
+   ============================================================ */
+const SUPABASE_URL = 'YOUR_SUPABASE_URL';
+const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
+
+function cloudConfigured() {
+  return typeof SUPABASE_URL === 'string'
+      && typeof SUPABASE_ANON_KEY === 'string'
+      && SUPABASE_URL.indexOf('YOUR_') === -1
+      && SUPABASE_ANON_KEY.indexOf('YOUR_') === -1
+      && /^https:\/\/.+/.test(SUPABASE_URL)
+      && SUPABASE_ANON_KEY.length > 20;
+}
+
+const sb = (cloudConfigured() && window.supabase)
+  ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: { flowType: 'implicit', detectSessionInUrl: true, persistSession: true, autoRefreshToken: true }
+    })
+  : null;
+
+let currentUserId = null;
+let interviewerStarted = false;
+let cloudUpdatedAt = null;
+let cloudSaveTimer = null;
+let cloudSavePending = false;
+let authGateEl = null;
+let rerenderInterviewer = null;
+
+function localCacheKey() {
+  return currentUserId ? (STORAGE_KEY + '-u-' + currentUserId) : STORAGE_KEY;
+}
+function readLegacyState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return (s && s.cycles && s.cycles.length) ? s : null;
+  } catch (e) { return null; }
+}
+function readLocalCache(uid) {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY + '-u-' + uid);
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    return (s && s.cycles && s.cycles.length) ? s : null;
+  } catch (e) { return null; }
+}
+
+/* ---- styling for the sign-in screen + account chip ---- */
+(function injectCloudStyles() {
+  const css =
+    '#vit-auth-gate{position:fixed;inset:0;background:var(--bg,#f4f5f7);display:none;align-items:center;justify-content:center;padding:20px;z-index:1000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}'
+  + '#vit-auth-card{background:#fff;border:1px solid var(--border,#e3e6ea);border-radius:14px;padding:30px 28px;max-width:380px;width:100%;box-shadow:0 10px 34px rgba(0,0,0,.10)}'
+  + '#vit-auth-logo{font-size:17px;font-weight:700;color:var(--text,#1b1d22);margin-bottom:6px}'
+  + '#vit-auth-sub{font-size:13px;line-height:1.5;color:var(--muted,#6b6f76);margin:0 0 18px}'
+  + '#vit-auth-form{display:flex;flex-direction:column;gap:10px}'
+  + '#vit-auth-email{padding:11px 12px;border:1px solid var(--border,#e3e6ea);border-radius:8px;font-size:14px;outline:none}'
+  + '#vit-auth-email:focus{border-color:var(--accent,#1a1a1a)}'
+  + '#vit-auth-btn{padding:11px 12px;border:none;border-radius:8px;background:var(--accent,#1a1a1a);color:#fff;font-size:14px;font-weight:600;cursor:pointer}'
+  + '#vit-auth-btn:disabled{opacity:.6;cursor:default}'
+  + '#vit-auth-msg{margin-top:14px;font-size:13px;line-height:1.5}'
+  + '#vit-auth-msg.ok{color:#2e7d32}'
+  + '#vit-auth-msg.err{color:#b71c1c}'
+  + '#vit-account{position:fixed;bottom:12px;right:14px;z-index:90;display:none;align-items:center;gap:7px;background:#fff;border:1px solid var(--border,#e3e6ea);border-radius:999px;padding:5px 7px 5px 11px;font-size:12px;box-shadow:0 2px 12px rgba(0,0,0,.10);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}'
+  + '#vit-sync-dot{width:8px;height:8px;border-radius:50%;background:#9aa0a6;flex:none}'
+  + '#vit-sync-text{color:var(--muted,#6b6f76)}'
+  + '#vit-acct-sep{width:1px;height:14px;background:var(--border,#e3e6ea)}'
+  + '#vit-acct-email{color:var(--text,#1b1d22);max-width:170px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+  + '#vit-signout{border:1px solid var(--border,#e3e6ea);background:var(--soft,#f8f9fb);border-radius:999px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--text,#1b1d22)}'
+  + '#vit-signout:hover{background:#eceef1}';
+  const tag = document.createElement('style');
+  tag.textContent = css;
+  document.head.appendChild(tag);
+})();
+
+/* ---- sign-in screen ---- */
+function buildAuthGate() {
+  if (authGateEl) return authGateEl;
+  const gate = document.createElement('div');
+  gate.id = 'vit-auth-gate';
+  gate.innerHTML =
+    '<div id="vit-auth-card">'
+    + '<div id="vit-auth-logo">Validation Interview Tool</div>'
+    + '<p id="vit-auth-sub">Sign in to open your interviews. We will email you a one-time sign-in link — no password to create or remember.</p>'
+    + '<form id="vit-auth-form">'
+    +   '<input id="vit-auth-email" type="email" required placeholder="you@example.com" autocomplete="email" />'
+    +   '<button id="vit-auth-btn" type="submit">Email me a sign-in link</button>'
+    + '</form>'
+    + '<div id="vit-auth-msg"></div>'
+    + '</div>';
+  document.body.appendChild(gate);
+  authGateEl = gate;
+  const form = gate.querySelector('#vit-auth-form');
+  const emailInput = gate.querySelector('#vit-auth-email');
+  const btn = gate.querySelector('#vit-auth-btn');
+  const msg = gate.querySelector('#vit-auth-msg');
+  form.addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const email = emailInput.value.trim();
+    if (!email || !sb) return;
+    btn.disabled = true;
+    btn.textContent = 'Sending...';
+    msg.className = '';
+    msg.textContent = '';
+    try {
+      const res = await sb.auth.signInWithOtp({
+        email: email,
+        options: {
+          emailRedirectTo: window.location.origin + window.location.pathname,
+          shouldCreateUser: true
+        }
+      });
+      if (res.error) throw res.error;
+      msg.className = 'ok';
+      msg.textContent = 'Check your inbox — we sent a sign-in link to ' + email + '. Click it to come back here signed in.';
+      form.style.display = 'none';
+    } catch (err) {
+      msg.className = 'err';
+      msg.textContent = (err && err.message) ? err.message : 'Could not send the link. Please try again.';
+      btn.disabled = false;
+      btn.textContent = 'Email me a sign-in link';
+    }
+  });
+  return gate;
+}
+function showAuthGate(mode) {
+  const gate = buildAuthGate();
+  gate.style.display = 'flex';
+  const ui = document.getElementById('interviewer-ui');
+  if (ui) ui.style.display = 'none';
+  if (mode === 'returning') {
+    const form = gate.querySelector('#vit-auth-form');
+    const msg = gate.querySelector('#vit-auth-msg');
+    if (form) form.style.display = 'none';
+    if (msg) { msg.className = ''; msg.textContent = 'Signing you in...'; }
+  }
+}
+function hideAuthGate() {
+  if (authGateEl) authGateEl.style.display = 'none';
+  const ui = document.getElementById('interviewer-ui');
+  if (ui) ui.style.display = '';
+}
+
+/* ---- account chip + sync status ---- */
+function buildAccountWidget(email) {
+  let w = document.getElementById('vit-account');
+  if (!w) {
+    w = document.createElement('div');
+    w.id = 'vit-account';
+    w.innerHTML =
+      '<span id="vit-sync-dot"></span>'
+      + '<span id="vit-sync-text">Synced</span>'
+      + '<span id="vit-acct-sep"></span>'
+      + '<span id="vit-acct-email"></span>'
+      + '<button id="vit-signout" type="button">Sign out</button>';
+    document.body.appendChild(w);
+    w.querySelector('#vit-signout').addEventListener('click', async function () {
+      try { if (sb) await sb.auth.signOut(); } catch (e) {}
+      location.reload();
+    });
+  }
+  w.querySelector('#vit-acct-email').textContent = email || '';
+  w.style.display = 'flex';
+}
+function setSyncStatus(kind, text) {
+  const dot = document.getElementById('vit-sync-dot');
+  const txt = document.getElementById('vit-sync-text');
+  if (!dot || !txt) return;
+  const colors = { ok: '#2e7d32', saving: '#c9911f', err: '#b71c1c', local: '#9aa0a6' };
+  dot.style.background = colors[kind] || colors.local;
+  txt.textContent = text || '';
+}
+
+/* ---- cloud read / write (one row per user, RLS-protected) ---- */
+async function cloudLoad(uid) {
+  const res = await sb.from('interview_state').select('data,updated_at').eq('user_id', uid).maybeSingle();
+  if (res.error) throw res.error;
+  return res.data;
+}
+async function cloudUpsert(uid, st) {
+  const now = new Date().toISOString();
+  const res = await sb.from('interview_state')
+    .upsert({ user_id: uid, data: st, updated_at: now }, { onConflict: 'user_id' });
+  if (res.error) throw res.error;
+  cloudUpdatedAt = now;
+}
+function scheduleCloudSave() {
+  if (!cloudConfigured() || !sb || !currentUserId) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSavePending = true;
+  setSyncStatus('saving', 'Saving...');
+  cloudSaveTimer = setTimeout(async function () {
+    try {
+      await cloudUpsert(currentUserId, state);
+      cloudSavePending = false;
+      setSyncStatus('ok', 'Synced');
+    } catch (e) {
+      cloudSavePending = false;
+      console.warn('cloud save failed', e);
+      setSyncStatus('err', 'Offline — saved on this device');
+    }
+  }, 700);
+}
+
+/* ---- load a signed-in user's data (with first-run migration) ---- */
+async function loadUserState(uid) {
+  try {
+    const row = await cloudLoad(uid);
+    if (row && row.data && row.data.cycles && row.data.cycles.length) {
+      state = row.data;
+      cloudUpdatedAt = row.updated_at;
+      try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) {}
+      return;
+    }
+    /* No row yet: first time this account is used. */
+    let seed = defaultState();
+    const legacy = readLegacyState();
+    if (legacy && !localStorage.getItem('vit-migrated-' + uid)) {
+      try {
+        if (window.confirm('Import the interview data already saved in this browser into your account?')) {
+          seed = legacy;
+        }
+      } catch (e) {}
+      try { localStorage.setItem('vit-migrated-' + uid, '1'); } catch (e) {}
+    }
+    state = seed;
+    try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) {}
+    await cloudUpsert(uid, state);
+  } catch (e) {
+    console.warn('cloud load failed, using local copy', e);
+    const cached = readLocalCache(uid);
+    if (cached) state = cached;
+    setSyncStatus('err', 'Offline — using local copy');
+  }
+}
+
+/* ---- pull newer data when returning to the tab (other device) ---- */
+async function refreshFromCloud() {
+  if (!sb || !currentUserId || document.hidden || cloudSavePending) return;
+  try {
+    const row = await cloudLoad(currentUserId);
+    if (row && row.updated_at && row.updated_at !== cloudUpdatedAt
+        && row.data && row.data.cycles && row.data.cycles.length) {
+      state = row.data;
+      cloudUpdatedAt = row.updated_at;
+      try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) {}
+      if (typeof rerenderInterviewer === 'function') rerenderInterviewer();
+      setSyncStatus('ok', 'Synced — updated');
+    }
+  } catch (e) { /* transient: ignore */ }
+}
+function startFocusRefresh() {
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) refreshFromCloud();
+  });
+  window.addEventListener('focus', refreshFromCloud);
+}
+
+/* ---- called once a session exists ---- */
+async function onSignedIn(session) {
+  if (interviewerStarted) return;
+  interviewerStarted = true;
+  currentUserId = session.user.id;
+  hideAuthGate();
+  buildAccountWidget(session.user.email);
+  setSyncStatus('saving', 'Loading...');
+  await loadUserState(currentUserId);
+  initInterviewerMode();
+  setSyncStatus('ok', 'Synced');
+  startFocusRefresh();
+}
+
+/* ---- entry point for interviewer (host) mode ---- */
+function bootInterviewer() {
+  if (!cloudConfigured()) {
+    /* Local-only mode: behaves exactly as before, no sign-in. */
+    interviewerStarted = true;
+    initInterviewerMode();
+    return;
+  }
+  if (!window.supabase || !sb) {
+    const gate = buildAuthGate();
+    gate.style.display = 'flex';
+    const form = gate.querySelector('#vit-auth-form');
+    const msg = gate.querySelector('#vit-auth-msg');
+    if (form) form.style.display = 'none';
+    if (msg) {
+      msg.className = 'err';
+      msg.textContent = 'Could not load the sign-in service. Check your internet connection and refresh the page.';
+    }
+    return;
+  }
+  const returning = window.location.hash.indexOf('access_token') !== -1
+                 || window.location.hash.indexOf('error') !== -1
+                 || !!new URLSearchParams(window.location.search).get('code');
+  showAuthGate(returning ? 'returning' : null);
+  sb.auth.getSession().then(function (r) {
+    if (r && r.data && r.data.session) onSignedIn(r.data.session);
+  });
+  sb.auth.onAuthStateChange(function (event, session) {
+    if (session) onSignedIn(session);
+    else if (interviewerStarted) location.reload();
+  });
+}
+
+const STATEMENT_TYPES = [
+  { key: 'headline',  label: 'Headline'   },
+  { key: 'quote',     label: 'Pain quote' },
+  { key: 'promise',   label: 'Promise'    },
+  { key: 'feature',   label: 'Feature'    },
+  { key: 'price',     label: 'Price'      },
+  { key: 'custom',    label: 'Custom'     },
+];
+
+function uid() { return 'id-' + Math.random().toString(36).slice(2, 10); }
+
+function defaultSlides() {
+  return [
+    {
+      id: uid(),
+      color: '#e53935',
+      headline: 'Stop Being the Bottleneck in Your Own Food Truck Business',
+      statements: [
+        { id: uid(), type: 'quote',   text: '"I built this business for freedom, but now everything depends on me. If I stop moving, the business stops moving."' },
+        { id: uid(), type: 'promise', text: 'Now you can reduce operational chaos with standardized prep, staffing, and event workflows.' },
+        { id: uid(), type: 'feature', text: 'Centralized prep and operational checklists' },
+        { id: uid(), type: 'feature', text: 'Repeatable event execution systems' },
+        { id: uid(), type: 'feature', text: 'Staff delegation and accountability workflows' },
+        { id: uid(), type: 'feature', text: 'Scheduling and coordination systems that reduce owner dependency' },
+        { id: uid(), type: 'price',   text: '$3,000 onboarding + operational systems implementation' },
+      ]
+    },
+    {
+      id: uid(),
+      color: '#f57c00',
+      headline: 'Stop Guessing Which Events Will Actually Make You Money',
+      statements: [
+        { id: uid(), type: 'quote',   text: '"I spend thousands prepping for events and still don\'t know if I\'ll profit until the day is over."' },
+        { id: uid(), type: 'promise', text: 'Now you can evaluate event profitability with forecasting tools and operational planning systems.' },
+        { id: uid(), type: 'feature', text: 'Event profitability calculator' },
+        { id: uid(), type: 'feature', text: 'Prep forecasting and staffing planning' },
+        { id: uid(), type: 'feature', text: 'Event scoring system based on attendance, fees, and competition' },
+        { id: uid(), type: 'feature', text: 'Operational playbooks for high-volume event execution' },
+        { id: uid(), type: 'price',   text: '$750/month event optimization and planning membership' },
+      ]
+    },
+    {
+      id: uid(),
+      color: '#2f80ed',
+      headline: 'Build a Food Truck Business That Runs Without You',
+      statements: [
+        { id: uid(), type: 'quote',   text: '"We grew fast, but now consistency, staffing, and operations are harder than the cooking itself."' },
+        { id: uid(), type: 'promise', text: 'Now you can scale multiple food truck operations with repeatable systems and management infrastructure.' },
+        { id: uid(), type: 'feature', text: 'Multi-unit operations systems' },
+        { id: uid(), type: 'feature', text: 'Staff training and consistency workflows' },
+        { id: uid(), type: 'feature', text: 'Inventory and commissary coordination systems' },
+        { id: uid(), type: 'feature', text: 'Internal operations dashboards and SOP libraries' },
+        { id: uid(), type: 'price',   text: '$12,000 multi-unit operational scaling engagement' },
+      ]
+    }
+  ];
+}
+
+function defaultParticipants() {
+  return [
+    { id: uid(), label: 'P1', name: '' },
+    { id: uid(), label: 'P2', name: '' },
+    { id: uid(), label: 'P3', name: '' },
+    { id: uid(), label: 'P4', name: '' },
+    { id: uid(), label: 'P5', name: '' },
+  ];
+}
+
+function defaultCycle(name) {
+  return {
+    id: uid(),
+    name: name || 'Cycle 1',
+    slides: defaultSlides(),
+    participants: defaultParticipants(),
+    reactions: {},
+    activeSlideId: null,
+    activeParticipantId: null
+  };
+}
+
+function defaultState() {
+  const c1 = defaultCycle('Cycle 1');
+  c1.activeSlideId = c1.slides[0].id;
+  c1.activeParticipantId = c1.participants[0].id;
+  return {
+    cycles: [c1],
+    activeCycleId: c1.id,
+    scoreMap: { ...DEFAULT_SCORE_MAP },
+    activeView: 'interview'
+  };
+}
+
+function loadLocalState() {
+  try {
+    const raw = localStorage.getItem(localCacheKey());
+    const s = raw ? JSON.parse(raw) : defaultState();
+    if (!s || !s.cycles || s.cycles.length === 0) return defaultState();
+    return s;
+  } catch (e) { return defaultState(); }
+}
+
+let state = loadLocalState();
+
+function save() {
+  try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) { console.warn('save failed', e); }
+  scheduleCloudSave();
+}
+
+function activeCycle() { return state.cycles.find(c => c.id === state.activeCycleId) || state.cycles[0]; }
+function rkey(pId, sId, stId) { return `${pId}|${sId}|${stId}`; }
+
+/* ============================================================
+   ENCODING (URL-safe base64 for slides + reactions)
+   ============================================================ */
+function encodePayload(obj) {
+  const json = JSON.stringify(obj);
+  // Use unicode-safe base64
+  const bytes = new TextEncoder().encode(json);
+  let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function decodePayload(s) {
+  let b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  const json = new TextDecoder().decode(bytes);
+  return JSON.parse(json);
+}
+
+// Compressed variants — used for the participant URL's data param.
+// Prefix 'g' marks gzip-compressed; decoder auto-detects either format.
+async function encodePayloadCompressed(obj) {
+  const json = JSON.stringify(obj);
+  if (typeof CompressionStream !== 'undefined') {
+    try {
+      const stream = new Blob([json]).stream().pipeThrough(new CompressionStream('gzip'));
+      const buf = await new Response(stream).arrayBuffer();
+      const bytes = new Uint8Array(buf);
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      return 'g' + btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    } catch (e) { /* fall through */ }
+  }
+  return encodePayload(obj);
+}
+async function decodePayloadCompressed(s) {
+  if (s && s[0] === 'g' && typeof DecompressionStream !== 'undefined') {
+    try {
+      let b64 = s.slice(1).replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+      const json = await new Response(stream).text();
+      return JSON.parse(json);
+    } catch (e) { /* fall through */ }
+  }
+  // Backward compat for old uncompressed links
+  return decodePayload(s);
+}
+
+/* ============================================================
+   PARTICIPANT MODE DETECTION
+   ============================================================ */
+const urlParams = new URLSearchParams(window.location.search);
+const participantMode = urlParams.get('view') === 'participant';
+
+if (participantMode) {
+  document.body.classList.add('participant-mode');
+  document.getElementById('interviewer-ui').style.display = 'none';
+  document.getElementById('participant-ui').style.display = '';
+  initParticipantMode();
+} else {
+  bootInterviewer();
+}
+
+/* ============================================================
+   ============================================================
+   INTERVIEWER MODE
+   ============================================================
+   ============================================================ */
+function initInterviewerMode() {
+
+const cycleSelect = document.getElementById('cycle-select');
+const slideContainer = document.getElementById('slide-container');
+const interviewNav = document.getElementById('interview-nav');
+const participantSelect = document.getElementById('participant-select');
+const participantNameInput = document.getElementById('participant-name-input');
+
+function colorForScore(score) {
+  if (score === null || score === undefined) return { bg: 'var(--hm-0)', fg: 'var(--text)' };
+  if (score >= 3)  return { bg: 'var(--hm-3)', fg: 'white' };
+  if (score >= 2)  return { bg: 'var(--hm-2)', fg: 'white' };
+  if (score >= 1)  return { bg: 'var(--hm-1)', fg: 'var(--text)' };
+  if (score === 0) return { bg: 'var(--hm-0)', fg: 'var(--text)' };
+  if (score >= -1) return { bg: 'var(--hm--1)', fg: 'var(--text)' };
+  if (score >= -2) return { bg: 'var(--hm--2)', fg: 'white' };
+  return { bg: 'var(--hm--3)', fg: 'white' };
+}
+function reactionToScore(rxn) { return rxn ? (state.scoreMap[rxn] || 0) : 0; }
+function reactionEmoji(rxn) { return rxn === 'love' ? '❤️' : rxn === 'like' ? '👍' : rxn === 'dislike' ? '👎' : ''; }
+
+const views = ['interview', 'heatmap', 'share', 'edit', 'participants', 'export'];
+function setView(v) {
+  state.activeView = v; save();
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
+  views.forEach(name => {
+    const el = document.getElementById('view-' + name);
+    if (el) el.style.display = (name === v) ? '' : 'none';
+  });
+  if (v === 'interview') renderInterview();
+  if (v === 'heatmap') renderHeatmap();
+  if (v === 'share') renderShare();
+  if (v === 'edit') renderEditSlides();
+  if (v === 'participants') renderParticipants();
+  if (v === 'export') renderExportPreview();
+}
+document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setView(t.dataset.view)));
+
+function renderCycleSelect() {
+  cycleSelect.innerHTML = state.cycles.map(c => `<option value="${c.id}" ${c.id === state.activeCycleId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+}
+cycleSelect.addEventListener('change', () => { state.activeCycleId = cycleSelect.value; save(); setView(state.activeView); });
+document.getElementById('add-cycle').addEventListener('click', () => {
+  const name = prompt('New cycle name?', `Cycle ${state.cycles.length + 1}`);
+  if (!name) return;
+  const c = defaultCycle(name);
+  c.activeSlideId = c.slides[0].id; c.activeParticipantId = c.participants[0].id;
+  state.cycles.push(c); state.activeCycleId = c.id;
+  save(); renderCycleSelect(); setView(state.activeView);
+});
+document.getElementById('rename-cycle').addEventListener('click', () => {
+  const c = activeCycle();
+  const name = prompt('Rename cycle:', c.name);
+  if (!name) return;
+  c.name = name; save(); renderCycleSelect();
+});
+document.getElementById('delete-cycle').addEventListener('click', () => {
+  if (state.cycles.length === 1) { showToast('You need at least one cycle'); return; }
+  const c = activeCycle();
+  if (!confirm(`Delete "${c.name}" and all its data?`)) return;
+  state.cycles = state.cycles.filter(x => x.id !== c.id);
+  state.activeCycleId = state.cycles[0].id;
+  save(); renderCycleSelect(); setView(state.activeView);
+});
+
+participantSelect.addEventListener('change', () => {
+  activeCycle().activeParticipantId = participantSelect.value;
+  save(); renderInterview();
+});
+participantNameInput.addEventListener('input', () => {
+  const c = activeCycle();
+  const p = c.participants.find(x => x.id === c.activeParticipantId);
+  if (p) { p.name = participantNameInput.value; save(); renderParticipantSelect(); }
+});
+function renderParticipantSelect() {
+  const c = activeCycle();
+  participantSelect.innerHTML = c.participants.map(p => {
+    const display = p.name ? `${p.label} — ${escapeHtml(p.name)}` : p.label;
+    return `<option value="${p.id}" ${p.id === c.activeParticipantId ? 'selected' : ''}>${display}</option>`;
+  }).join('');
+  const p = c.participants.find(x => x.id === c.activeParticipantId);
+  participantNameInput.value = p?.name || '';
+}
+
+function renderInterviewNav() {
+  const c = activeCycle();
+  interviewNav.innerHTML = c.slides.map((s, i) => {
+    const reacted = countReactionsForSlide(c, c.activeParticipantId, s.id);
+    return `<button class="slide-pill ${s.id === c.activeSlideId ? 'active' : ''}" data-slide-id="${s.id}" style="--slide-accent:${s.color}">
+      Slide ${i + 1} <span class="progress">${reacted}/${s.statements.length + 1}</span>
+    </button>`;
+  }).join('');
+  interviewNav.querySelectorAll('.slide-pill').forEach(p => {
+    p.addEventListener('click', () => {
+      activeCycle().activeSlideId = p.dataset.slideId;
+      save(); renderInterview();
+    });
+  });
+}
+function countReactionsForSlide(c, pId, sId) {
+  const slide = c.slides.find(x => x.id === sId);
+  let count = 0;
+  if (c.reactions[rkey(pId, sId, 'headline')]?.reaction) count++;
+  for (const st of slide.statements) {
+    if (c.reactions[rkey(pId, sId, st.id)]?.reaction) count++;
+  }
+  return count;
+}
+
+function renderInterview() {
+  const c = activeCycle();
+  if (!c.activeSlideId || !c.slides.find(s => s.id === c.activeSlideId)) c.activeSlideId = c.slides[0]?.id;
+  if (!c.activeParticipantId || !c.participants.find(p => p.id === c.activeParticipantId)) c.activeParticipantId = c.participants[0]?.id;
+  renderParticipantSelect();
+  renderInterviewNav();
+
+  const slide = c.slides.find(s => s.id === c.activeSlideId);
+  if (!slide) { slideContainer.innerHTML = '<div class="panel">No slides — go to Edit slides to add some.</div>'; return; }
+
+  let html = `<div class="slide-card" style="--slide-accent:${slide.color}">`;
+  html += `<h2 class="headline">${escapeHtml(slide.headline)}</h2>`;
+  html += renderStatementRow(c, slide, { id: 'headline', type: 'headline', text: slide.headline }, 'Headline');
+
+  const fIdx = (() => { let i = 0; return () => ++i; })();
+  for (const st of slide.statements) {
+    const lbl = st.type === 'feature' ? `Feature ${fIdx()}` : (STATEMENT_TYPES.find(t => t.key === st.type)?.label || 'Statement');
+    html += renderStatementRow(c, slide, st, lbl);
+  }
+  html += `</div>`;
+  slideContainer.innerHTML = html;
+
+  slideContainer.querySelectorAll('.rxn-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const stKey = btn.dataset.stKey;
+      const rxn = btn.dataset.reaction;
+      const k = rkey(c.activeParticipantId, slide.id, stKey);
+      const cur = c.reactions[k] || {};
+      cur.reaction = (cur.reaction === rxn) ? null : rxn;
+      c.reactions[k] = cur;
+      save(); renderInterview();
+    });
+  });
+  slideContainer.querySelectorAll('.phrase-input').forEach(inp => {
+    inp.addEventListener('input', () => {
+      const stKey = inp.dataset.stKey;
+      const k = rkey(c.activeParticipantId, slide.id, stKey);
+      const cur = c.reactions[k] || {};
+      cur.phrases = inp.value;
+      c.reactions[k] = cur;
+      save();
+    });
+  });
+}
+function renderStatementRow(c, slide, st, labelText) {
+  const k = rkey(c.activeParticipantId, slide.id, st.id);
+  const r = c.reactions[k] || {};
+  const cls = 'is-' + st.type;
+  return `<div class="statement-row ${r.reaction ? 'has-reaction' : ''}">
+    <div class="stmt">
+      <div class="stmt-meta"><span class="stmt-label">${escapeHtml(labelText)}</span></div>
+      <div class="stmt-text ${cls}">${escapeHtml(st.text)}</div>
+      <input class="phrase-input" data-st-key="${st.id}" placeholder="Your private notes / key phrase…" value="${escapeHtml(r.phrases || '')}" />
+    </div>
+    <div class="reaction-buttons">
+      <button class="rxn-btn love ${r.reaction === 'love' ? 'active' : ''}" data-st-key="${st.id}" data-reaction="love" title="super positive">❤️</button>
+      <button class="rxn-btn like ${r.reaction === 'like' ? 'active' : ''}" data-st-key="${st.id}" data-reaction="like" title="positive">👍</button>
+      <button class="rxn-btn dislike ${r.reaction === 'dislike' ? 'active' : ''}" data-st-key="${st.id}" data-reaction="dislike" title="negative">👎</button>
+    </div>
+  </div>`;
+}
+
+document.getElementById('prev-slide').addEventListener('click', () => moveSlide(-1));
+document.getElementById('next-slide').addEventListener('click', () => moveSlide(1));
+function moveSlide(delta) {
+  const c = activeCycle();
+  const idx = c.slides.findIndex(s => s.id === c.activeSlideId);
+  const next = idx + delta;
+  if (next < 0 || next >= c.slides.length) return;
+  c.activeSlideId = c.slides[next].id;
+  save(); renderInterview();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.getElementById('manage-pp').addEventListener('click', () => setView('participants'));
+document.getElementById('quick-share-link').addEventListener('click', () => setView('share'));
+document.getElementById('quick-import-code').addEventListener('click', () => setView('share'));
+
+/* ---- HEATMAP ---- */
+const scoreLove = document.getElementById('score-love');
+const scoreLike = document.getElementById('score-like');
+const scoreDislike = document.getElementById('score-dislike');
+[['love', scoreLove], ['like', scoreLike], ['dislike', scoreDislike]].forEach(([k, el]) => {
+  el.addEventListener('input', () => {
+    const v = parseInt(el.value, 10);
+    if (!isNaN(v)) { state.scoreMap[k] = v; save(); renderHeatmap(); }
+  });
+});
+
+function buildHeatmapHtml(c, participantsList, totalsLabel) {
+  const pps = participantsList || c.participants;
+  let html = '';
+  html += '<thead><tr><th class="label">Statement</th>';
+  for (const p of pps) {
+    const display = p.name ? `${escapeHtml(p.label)}<br><span style="font-weight:400;font-size:11px;color:var(--muted)">${escapeHtml(p.name)}</span>` : escapeHtml(p.label);
+    html += `<th>${display}</th>`;
+  }
+  html += '<th>Total</th></tr></thead><tbody>';
+
+  const colTotals = pps.map(_ => 0);
+  for (const slide of c.slides) {
+    html += `<tr class="slide-divider" style="--slide-accent:${slide.color}"><td colspan="${pps.length + 2}">${escapeHtml(slide.headline)}</td></tr>`;
+    html += buildHeatmapRow(c, slide, { id: 'headline', type: 'headline', text: slide.headline }, 'Headline', pps, colTotals);
+    let fIdx = 0;
+    for (const st of slide.statements) {
+      let lbl;
+      if (st.type === 'feature') { fIdx++; lbl = `Feature ${fIdx}`; }
+      else lbl = STATEMENT_TYPES.find(t => t.key === st.type)?.label || 'Statement';
+      html += buildHeatmapRow(c, slide, st, lbl, pps, colTotals);
+    }
+  }
+
+  html += `<tr class="totals-row"><td class="label">${escapeHtml(totalsLabel || 'Participant total')}</td>`;
+  let grand = 0;
+  for (let i = 0; i < pps.length; i++) { html += `<td>${colTotals[i]}</td>`; grand += colTotals[i]; }
+  html += `<td>${grand}</td></tr></tbody>`;
+  return html;
+}
+
+function buildHeatmapRow(c, slide, st, labelText, pps, colTotals) {
+  let row = `<tr><td class="label"><span class="small-label">${escapeHtml(labelText)}</span>${escapeHtml(st.text)}</td>`;
+  let rowTotal = 0;
+  pps.forEach((p, i) => {
+    const r = c.reactions[rkey(p.id, slide.id, st.id)];
+    const score = r?.reaction ? reactionToScore(r.reaction) : null;
+    const col = colorForScore(score);
+    if (score !== null) { rowTotal += score; colTotals[i] += score; }
+    const phrase = r?.phrases ? `title="${escapeHtml(r.phrases)}"` : '';
+    const phraseClass = r?.phrases ? 'has-phrase' : '';
+    row += `<td class="score-cell ${phraseClass}" data-p-id="${p.id}" data-s-id="${slide.id}" data-st-id="${st.id}" style="background:${col.bg};color:${col.fg}" ${phrase}>
+      <span class="emoji">${reactionEmoji(r?.reaction) || '·'}</span>
+      <span class="score-num">${score === null ? '' : (score > 0 ? '+' + score : score)}</span>
+    </td>`;
+  });
+  row += `<td class="total-cell">${rowTotal}</td></tr>`;
+  return row;
+}
+
+function renderPdfFilterDropdown() {
+  const c = activeCycle();
+  const sel = document.getElementById('pdf-participant-filter');
+  if (!sel) return;
+  const prev = sel.value;
+  let html = '<option value="all">All participants</option>';
+  for (const p of c.participants) {
+    html += `<option value="${p.id}">${escapeHtml(p.label + (p.name ? ' (' + p.name + ')' : ''))} only</option>`;
+  }
+  sel.innerHTML = html;
+  if (prev && (prev === 'all' || c.participants.some(p => p.id === prev))) sel.value = prev;
+}
+
+function renderHeatmap() {
+  scoreLove.value = state.scoreMap.love;
+  scoreLike.value = state.scoreMap.like;
+  scoreDislike.value = state.scoreMap.dislike;
+
+  const c = activeCycle();
+  const table = document.getElementById('heatmap-table');
+  table.innerHTML = buildHeatmapHtml(c);
+
+  table.querySelectorAll('td.score-cell').forEach(td => {
+    td.addEventListener('click', () => openCellEditor(td.dataset.pId, td.dataset.sId, td.dataset.stId));
+  });
+  renderHeatmapLegend();
+  renderPdfFilterDropdown();
+}
+function renderHeatmapLegend() {
+  const sm = state.scoreMap;
+  const items = [
+    { score: sm.love, label: '❤️ super positive' },
+    { score: sm.like, label: '👍 positive' },
+    { score: 0, label: '· no reaction' },
+    { score: sm.dislike, label: '👎 negative' },
+  ];
+  const wrap = document.getElementById('heatmap-legend');
+  wrap.innerHTML = items.map(it => {
+    const col = colorForScore(it.score);
+    const cls = it.score === 0 ? 'n' : '';
+    return `<span class="legend-swatch ${cls}" style="background:${col.bg};color:${col.fg}">${escapeHtml(it.label)} (${it.score > 0 ? '+' + it.score : it.score})</span>`;
+  }).join('') + ' <span style="margin-left:10px">Click any cell to edit reaction or phrase. Cells with a • have a saved phrase (hover to view).</span>';
+}
+
+function openCellEditor(pId, sId, stId) {
+  const c = activeCycle();
+  const p = c.participants.find(x => x.id === pId);
+  const s = c.slides.find(x => x.id === sId);
+  let stText, stLabel;
+  if (stId === 'headline') { stText = s.headline; stLabel = 'Headline'; }
+  else {
+    const st = s.statements.find(x => x.id === stId);
+    stText = st.text;
+    let fIdx = 0;
+    for (const x of s.statements) { if (x.type === 'feature') fIdx++; if (x.id === stId) break; }
+    stLabel = st.type === 'feature' ? `Feature ${fIdx}` : (STATEMENT_TYPES.find(t => t.key === st.type)?.label || 'Statement');
+  }
+  const k = rkey(pId, sId, stId);
+  const r = c.reactions[k] || {};
+  const body = `
+    <h3 style="margin-top:0">Edit reaction</h3>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:4px">${escapeHtml(p.label)}${p.name ? ' — ' + escapeHtml(p.name) : ''} · ${escapeHtml(stLabel)}</div>
+    <div style="font-size:14px;margin-bottom:14px;padding:10px;background:var(--soft);border-radius:8px;border:1px solid var(--border)">${escapeHtml(stText)}</div>
+    <div class="reaction-buttons" id="modal-rxn" style="margin-bottom:14px">
+      <button class="rxn-btn love ${r.reaction === 'love' ? 'active' : ''}" data-rxn="love">❤️</button>
+      <button class="rxn-btn like ${r.reaction === 'like' ? 'active' : ''}" data-rxn="like">👍</button>
+      <button class="rxn-btn dislike ${r.reaction === 'dislike' ? 'active' : ''}" data-rxn="dislike">👎</button>
+      <button class="btn tiny" id="modal-clear" style="margin-left:8px">Clear</button>
+    </div>
+    <label class="field-label">Your private note</label>
+    <textarea id="modal-phrase" style="width:100%;min-height:70px">${escapeHtml(r.phrases || '')}</textarea>
+    <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:6px">
+      <button class="btn" id="modal-cancel">Close</button>
+      <button class="btn primary" id="modal-save">Save</button>
+    </div>`;
+  showModal(body);
+  document.querySelectorAll('#modal-rxn .rxn-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#modal-rxn .rxn-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+  document.getElementById('modal-clear').addEventListener('click', () => {
+    document.querySelectorAll('#modal-rxn .rxn-btn').forEach(b => b.classList.remove('active'));
+  });
+  document.getElementById('modal-cancel').addEventListener('click', closeModal);
+  document.getElementById('modal-save').addEventListener('click', () => {
+    const active = document.querySelector('#modal-rxn .rxn-btn.active');
+    const phrase = document.getElementById('modal-phrase').value;
+    if (!active && !phrase) { delete c.reactions[k]; }
+    else { c.reactions[k] = { reaction: active ? active.dataset.rxn : null, phrases: phrase }; }
+    save(); closeModal(); renderHeatmap();
+  });
+}
+document.getElementById('hm-export-csv').addEventListener('click', () => downloadCsv(activeCycle()));
+
+document.getElementById('hm-export-pdf').addEventListener('click', () => {
+  const c = activeCycle();
+  const filterPpId = document.getElementById('pdf-participant-filter').value;
+  const filterPp = filterPpId === 'all' ? null : c.participants.find(p => p.id === filterPpId);
+  const ppsToShow = filterPp ? [filterPp] : c.participants;
+
+  // Build the print header
+  const dateStr = new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+  const sm = state.scoreMap;
+  const titleSuffix = filterPp ? ` — ${filterPp.label}${filterPp.name ? ' (' + filterPp.name + ')' : ''}` : '';
+  const ppListDisplay = filterPp
+    ? `<strong>Participant:</strong> ${escapeHtml(filterPp.label + (filterPp.name ? ' (' + filterPp.name + ')' : ''))}`
+    : `<strong>Participants:</strong> ${escapeHtml(c.participants.map(p => p.label + (p.name ? ' (' + p.name + ')' : '')).join(', '))}`;
+  document.getElementById('print-header').innerHTML = `
+    <h1>Validation Interview Heatmap — ${escapeHtml(c.name)}${escapeHtml(titleSuffix)}</h1>
+    <div class="meta">
+      <strong>Date:</strong> ${escapeHtml(dateStr)} &nbsp;·&nbsp;
+      ${ppListDisplay} &nbsp;·&nbsp;
+      <strong>Score map:</strong> ❤️=${sm.love}, 👍=${sm.like}, 👎=${sm.dislike}
+    </div>`;
+
+  // Re-render the heatmap table with the filter applied
+  const totalsLabel = filterPp ? `Total for ${filterPp.label}${filterPp.name ? ' (' + filterPp.name + ')' : ''}` : 'Participant total';
+  document.getElementById('heatmap-table').innerHTML = buildHeatmapHtml(c, ppsToShow, totalsLabel);
+
+  // Build the notes section — filtered to selected participants
+  const notesRows = [];
+  for (const slide of c.slides) {
+    let fIdx = 0;
+    const slideNotes = [];
+    const stmts = [{ id: 'headline', type: 'headline', text: slide.headline, label: 'Headline' }];
+    for (const st of slide.statements) {
+      let lbl;
+      if (st.type === 'feature') { fIdx++; lbl = 'Feature ' + fIdx; }
+      else lbl = STATEMENT_TYPES.find(t => t.key === st.type)?.label || 'Statement';
+      stmts.push({ id: st.id, type: st.type, text: st.text, label: lbl });
+    }
+    for (const st of stmts) {
+      for (const p of ppsToShow) {
+        const r = c.reactions[rkey(p.id, slide.id, st.id)];
+        if (r && r.phrases && r.phrases.trim()) {
+          const who = filterPp ? '' : `<strong>${escapeHtml(p.label)}${p.name ? ' (' + escapeHtml(p.name) + ')' : ''}</strong> · `;
+          slideNotes.push(`<div class="note-row">${who}<strong>${escapeHtml(st.label)}:</strong> "${escapeHtml(r.phrases)}"</div>`);
+        }
+      }
+    }
+    if (slideNotes.length) {
+      notesRows.push(`<div style="margin-bottom:10px"><strong style="color:${slide.color}">${escapeHtml(slide.headline)}</strong>${slideNotes.join('')}</div>`);
+    }
+  }
+  const notesHeading = filterPp
+    ? `Notes &amp; key phrases — ${escapeHtml(filterPp.label + (filterPp.name ? ' (' + filterPp.name + ')' : ''))}`
+    : 'Interviewer notes &amp; key phrases';
+  document.getElementById('print-notes').innerHTML = notesRows.length
+    ? `<h3>${notesHeading}</h3>${notesRows.join('')}`
+    : `<h3>${notesHeading}</h3><p style="color:#888;font-size:9pt">(No notes captured)</p>`;
+
+  // Ensure heatmap view is active
+  if (state.activeView !== 'heatmap') setView('heatmap');
+
+  // After printing, restore the unfiltered heatmap so the on-screen view is correct
+  const cleanup = () => {
+    renderHeatmap();
+    document.getElementById('print-notes').innerHTML = '';
+    document.getElementById('print-header').innerHTML = '';
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
+  setTimeout(() => window.print(), 100);
+});
+
+/* ---- SHARE TAB ---- */
+const isLocalFile = window.location.protocol === 'file:';
+
+function renderShare() {
+  const c = activeCycle();
+  const sel = document.getElementById('share-pp-target');
+  const sel2 = document.getElementById('import-target-pp');
+  const opts = c.participants.map(p => `<option value="${p.id}" ${p.id === c.activeParticipantId ? 'selected' : ''}>${escapeHtml(p.label + (p.name ? ' — ' + p.name : ''))}</option>`).join('');
+  sel.innerHTML = opts;
+  sel2.innerHTML = opts;
+  document.getElementById('generated-link-output').value = '';
+  document.getElementById('hosting-banner').style.display = isLocalFile ? '' : 'none';
+}
+
+document.getElementById('open-participant-view').addEventListener('click', () => {
+  const c = activeCycle();
+  const targetPp = document.getElementById('share-pp-target').value;
+  c.activeParticipantId = targetPp;
+  save();
+  const newUrl = new URL(window.location.href);
+  newUrl.searchParams.set('view', 'participant');
+  newUrl.searchParams.set('pp', targetPp);
+  newUrl.searchParams.set('local', '1');
+  window.location.href = newUrl.toString();
+});
+
+async function buildParticipantUrl() {
+  const c = activeCycle();
+  const slidesPayload = { cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap };
+  const data = await encodePayloadCompressed(slidesPayload);
+  const base = window.location.href.split(/[?#]/)[0];
+  return `${base}?view=participant&data=${data}`;
+}
+
+function updateLinkLengthInfo(currentUrl) {
+  const info = document.getElementById('link-length-info');
+  if (!info) return;
+  info.textContent = currentUrl ? `${currentUrl.length} chars` : '';
+}
+
+document.getElementById('generate-link-btn').addEventListener('click', async () => {
+  const url = await buildParticipantUrl();
+  document.getElementById('generated-link-output').value = url;
+  document.getElementById('copy-generated-link-btn').disabled = false;
+  updateLinkLengthInfo(url);
+  const warn = document.getElementById('link-warning');
+  if (isLocalFile) {
+    warn.style.display = '';
+    warn.textContent = '⚠ This URL points to a file on your local computer. The participant won\'t be able to open it from their phone. Either upload the tool file to a host like Netlify Drop, or use the standalone HTML option below.';
+  } else {
+    warn.style.display = 'none';
+  }
+  try { navigator.clipboard.writeText(url); showToast('Link generated and copied to clipboard'); }
+  catch { showToast('Link generated — select and copy below'); }
+});
+
+document.getElementById('copy-generated-link-btn').addEventListener('click', async () => {
+  const url = document.getElementById('generated-link-output').value;
+  if (!url) { showToast('Generate a link first'); return; }
+  try { await navigator.clipboard.writeText(url); showToast('Copied to clipboard'); }
+  catch { showToast('Copy failed — select & copy manually'); }
+});
+
+document.getElementById('share-link-btn').addEventListener('click', async () => {
+  const url = await buildParticipantUrl();
+  if (isLocalFile) {
+    document.getElementById('generated-link-output').value = url;
+    const warn = document.getElementById('link-warning');
+    warn.style.display = '';
+    warn.textContent = '⚠ You opened this tool from your hard drive. The link won\'t work on the participant\'s phone. Upload the tool file to netlify.com/drop first, or use the standalone HTML option below.';
+    return;
+  }
+  // Surface the URL in the textarea so the user can see what's being shared
+  document.getElementById('generated-link-output').value = url;
+  document.getElementById('copy-generated-link-btn').disabled = false;
+  updateLinkLengthInfo(url);
+
+  const c = activeCycle();
+  const shareText = `Hi! Quick favor — please tap this link and react to each statement on the slides with ❤️ 👍 or 👎. Takes about 3 minutes. ${url}`;
+  if (navigator.share) {
+    try {
+      await navigator.share({
+        title: c.name + ' — Validation Interview',
+        text: shareText,
+        url: url
+      });
+      showToast('Shared');
+    } catch (e) {
+      if (e.name !== 'AbortError') {
+        try { await navigator.clipboard.writeText(url); showToast('Share cancelled — link copied to clipboard'); }
+        catch { /* URL already in textarea */ }
+      }
+    }
+  } else {
+    try {
+      await navigator.clipboard.writeText(url);
+      showToast('Link copied to clipboard');
+    } catch {
+      showToast('Link generated — select and copy below');
+    }
+  }
+});
+
+document.getElementById('generate-standalone-btn').addEventListener('click', () => {
+  const c = activeCycle();
+  const html = buildStandaloneParticipantHtml(c.slides, c.name, state.scoreMap);
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `participant-${slugify(c.name)}-${dateStamp()}.html`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  showToast('Downloaded — email or text it to the participant');
+});
+
+function normTxt(s) {
+  return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+function parseRxnInput(payload) {
+  if (!payload) throw new Error('No payload');
+  if (payload.v === 2 && Array.isArray(payload.data)) {
+    return { version: 2, name: payload.name || '', data: payload.data };
+  }
+  if (payload.reactions && typeof payload.reactions === 'object') {
+    return { version: 1, name: payload.name || '', reactions: payload.reactions };
+  }
+  throw new Error('Not a valid reactions payload');
+}
+
+function countV1IdMatches(reactions, cycle) {
+  let count = 0;
+  for (const key of Object.keys(reactions)) {
+    if (key.indexOf('|headline') !== -1) {
+      const slideId = key.split('|')[0];
+      if (cycle.slides.some(s => s.id === slideId)) count++;
+    } else if (cycle.slides.some(slide => slide.statements.some(s => s.id === key))) {
+      count++;
+    }
+  }
+  return count;
+}
+
+function matchReactionsToCycle(parsed, cycle) {
+  const applied = [];
+  const skipped = [];
+  let usedFallback = false;
+
+  if (parsed.version === 2) {
+    // v2: text-based matching with ID and positional fallbacks
+    const usedSlideIds = new Set();
+    const usedStmtIdsBySlide = {};
+    parsed.data.forEach((incomingSlide, slideIdx) => {
+      let cs = cycle.slides.find(s => s.id === incomingSlide.i && !usedSlideIds.has(s.id));
+      if (!cs) cs = cycle.slides.find(s => normTxt(s.headline) === normTxt(incomingSlide.h) && !usedSlideIds.has(s.id));
+      if (!cs && cycle.slides[slideIdx] && !usedSlideIds.has(cycle.slides[slideIdx].id)) {
+        cs = cycle.slides[slideIdx];
+        usedFallback = true;
+      }
+      if (!cs) {
+        if (incomingSlide.hr) skipped.push({ text: incomingSlide.h, reaction: incomingSlide.hr, reason: 'no matching slide' });
+        (incomingSlide.s || []).forEach(st => {
+          if (st.r) skipped.push({ text: st.t, reaction: st.r, reason: 'no matching slide' });
+        });
+        return;
+      }
+      usedSlideIds.add(cs.id);
+      const used = usedStmtIdsBySlide[cs.id] = usedStmtIdsBySlide[cs.id] || new Set();
+      if (incomingSlide.hr) {
+        applied.push({ slideId: cs.id, stmtId: 'headline', reaction: incomingSlide.hr });
+      }
+      (incomingSlide.s || []).forEach((incomingSt, stIdx) => {
+        if (!incomingSt.r) return;
+        let match = cs.statements.find(s => s.id === incomingSt.i && !used.has(s.id));
+        if (!match) match = cs.statements.find(s => normTxt(s.text) === normTxt(incomingSt.t) && !used.has(s.id));
+        if (!match && cs.statements[stIdx] && !used.has(cs.statements[stIdx].id)) {
+          match = cs.statements[stIdx];
+          usedFallback = true;
+        }
+        if (match) {
+          used.add(match.id);
+          applied.push({ slideId: cs.id, stmtId: match.id, reaction: incomingSt.r });
+        } else {
+          skipped.push({ text: incomingSt.t, reaction: incomingSt.r, reason: 'no matching statement' });
+        }
+      });
+    });
+  } else {
+    // v1: try ID match first; if zero match, fall back to positional
+    const idMatchCount = countV1IdMatches(parsed.reactions, cycle);
+    if (idMatchCount > 0) {
+      for (const [key, reaction] of Object.entries(parsed.reactions)) {
+        if (key.indexOf('|headline') !== -1) {
+          const slideId = key.split('|')[0];
+          const slide = cycle.slides.find(s => s.id === slideId);
+          if (slide) applied.push({ slideId: slide.id, stmtId: 'headline', reaction });
+          else skipped.push({ text: '(headline)', reaction, reason: 'slide ID not in current cycle' });
+        } else {
+          let found = false;
+          for (const slide of cycle.slides) {
+            const st = slide.statements.find(s => s.id === key);
+            if (st) { applied.push({ slideId: slide.id, stmtId: st.id, reaction }); found = true; break; }
+          }
+          if (!found) skipped.push({ text: '(unknown statement)', reaction, reason: 'statement ID not in current cycle' });
+        }
+      }
+    } else {
+      // POSITIONAL FALLBACK — separate headlines from statements, then assign in order
+      usedFallback = true;
+      const entries = Object.entries(parsed.reactions);
+      const headlineEntries = entries.filter(([k]) => k.indexOf('|headline') !== -1);
+      const stmtEntries = entries.filter(([k]) => k.indexOf('|headline') === -1);
+
+      // Headlines: 1st to slide 1, 2nd to slide 2, etc.
+      cycle.slides.forEach((slide, i) => {
+        if (headlineEntries[i]) {
+          applied.push({ slideId: slide.id, stmtId: 'headline', reaction: headlineEntries[i][1] });
+        }
+      });
+      // Extra headlines (more than current slides) → skipped
+      for (let i = cycle.slides.length; i < headlineEntries.length; i++) {
+        skipped.push({ text: '(extra headline)', reaction: headlineEntries[i][1], reason: 'more headlines than current cycle has slides' });
+      }
+
+      // Statements: walk all current statements in order, assign each next entry
+      let cursor = 0;
+      for (const slide of cycle.slides) {
+        for (const st of slide.statements) {
+          if (cursor < stmtEntries.length) {
+            applied.push({ slideId: slide.id, stmtId: st.id, reaction: stmtEntries[cursor][1] });
+            cursor++;
+          }
+        }
+      }
+      while (cursor < stmtEntries.length) {
+        skipped.push({ text: '(extra statement)', reaction: stmtEntries[cursor][1], reason: 'more statements in code than in current cycle' });
+        cursor++;
+      }
+    }
+  }
+  return { applied, skipped, usedFallback, version: parsed.version };
+}
+
+document.getElementById('import-confirm').addEventListener('click', async () => {
+  const codeStr = document.getElementById('import-code-input').value.trim();
+  const file = document.getElementById('import-file').files[0];
+  let payload = null;
+  try {
+    if (file) {
+      payload = JSON.parse(await file.text());
+    } else if (codeStr) {
+      const cleaned = codeStr.replace(/^RXN-/, '').replace(/\s+/g, '');
+      payload = decodePayload(cleaned);
+    } else {
+      showToast('Paste a code or pick a file first'); return;
+    }
+  } catch (e) {
+    alert('Could not read code: ' + e.message); return;
+  }
+
+  let parsed;
+  try { parsed = parseRxnInput(payload); }
+  catch (e) { alert(e.message); return; }
+
+  const c = activeCycle();
+  const targetPp = document.getElementById('import-target-pp').value;
+  const target = c.participants.find(p => p.id === targetPp);
+  if (!target) { alert('Pick a participant slot'); return; }
+
+  const result = matchReactionsToCycle(parsed, c);
+
+  const applyImport = () => {
+    for (const m of result.applied) {
+      const k = rkey(target.id, m.slideId, m.stmtId);
+      const existing = c.reactions[k] || {};
+      c.reactions[k] = { reaction: m.reaction, phrases: existing.phrases || '' };
+    }
+    if (parsed.name && !target.name) target.name = parsed.name;
+    save();
+    renderShare();
+    showToast(`Imported ${result.applied.length} reactions${result.skipped.length ? ' (' + result.skipped.length + ' skipped)' : ''}`);
+    document.getElementById('import-code-input').value = '';
+    document.getElementById('import-file').value = '';
+  };
+
+  if (result.usedFallback || result.skipped.length > 0) {
+    let warning = '';
+    if (result.usedFallback && parsed.version === 1) {
+      warning += `<div style="background:#fff8e1;border:1px solid #f1c40f;padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:13px;line-height:1.5">
+        <strong>⚠ Older code format detected.</strong> The statement IDs in this code don't match your current slides (this happens when slides have been reset or regenerated). I'm falling back to <strong>positional matching</strong> — assuming the participant saw the same slides in the same order as your current cycle. <strong>Please double-check the heatmap after import.</strong>
+      </div>`;
+    } else if (result.usedFallback) {
+      warning += `<div style="background:#fff8e1;border:1px solid #f1c40f;padding:10px 14px;border-radius:8px;margin-bottom:10px;font-size:13px;line-height:1.5">
+        <strong>Note:</strong> Some reactions were matched by position rather than exact text or ID — usually because slides have been edited since the code was generated. <strong>Verify the heatmap looks right.</strong>
+      </div>`;
+    }
+    if (result.skipped.length > 0) {
+      warning += `<p style="font-size:13px"><strong>${result.skipped.length} reaction${result.skipped.length === 1 ? '' : 's'} couldn't be matched</strong> and will be skipped:</p>
+        <ul style="font-size:12px;color:var(--muted);max-height:140px;overflow-y:auto;padding-left:20px">`;
+      result.skipped.slice(0, 8).forEach(s => {
+        const emoji = s.reaction === 'love' ? '❤️' : s.reaction === 'like' ? '👍' : s.reaction === 'dislike' ? '👎' : '·';
+        warning += `<li>${emoji} <em>${escapeHtml((s.text || '').slice(0, 60))}</em> — ${escapeHtml(s.reason)}</li>`;
+      });
+      if (result.skipped.length > 8) warning += `<li>… and ${result.skipped.length - 8} more</li>`;
+      warning += '</ul>';
+    }
+    const targetLabel = target.label + (target.name ? ' (' + target.name + ')' : '');
+    showModal(`<h3 style="margin-top:0">Confirm import</h3>
+      <p style="font-size:13px">Will apply <strong>${result.applied.length} reaction${result.applied.length === 1 ? '' : 's'}</strong> to <strong>${escapeHtml(targetLabel)}</strong>.</p>
+      ${warning}
+      <div style="display:flex;gap:6px;justify-content:flex-end;margin-top:14px">
+        <button class="btn" id="import-cancel">Cancel</button>
+        <button class="btn primary" id="import-go">Apply import</button>
+      </div>`);
+    document.getElementById('import-cancel').addEventListener('click', closeModal);
+    document.getElementById('import-go').addEventListener('click', () => { applyImport(); closeModal(); });
+  } else {
+    applyImport();
+  }
+});
+
+/* ---- EDIT SLIDES ---- */
+function renderEditSlides() {
+  const c = activeCycle();
+  const wrap = document.getElementById('edit-slides-container');
+  let html = '';
+  c.slides.forEach((slide, idx) => {
+    let fIdx = 0;
+    html += `<div class="edit-slide" style="--slide-accent:${slide.color}" data-slide-id="${slide.id}">
+      <div class="edit-slide-head">
+        <div class="edit-slide-title">Slide ${idx + 1}</div>
+        <div style="display:flex;gap:4px">
+          <button class="btn tiny" data-action="up" ${idx === 0 ? 'disabled' : ''}>↑</button>
+          <button class="btn tiny" data-action="down" ${idx === c.slides.length - 1 ? 'disabled' : ''}>↓</button>
+          <button class="btn tiny" data-action="duplicate">Duplicate</button>
+          <button class="btn tiny danger" data-action="delete">Delete</button>
+        </div>
+      </div>
+      <div class="edit-field-group">
+        <label>Headline</label>
+        <input type="text" data-field="headline" value="${escapeHtml(slide.headline)}" />
+      </div>
+      <div class="edit-field-group">
+        <label>Accent color</label>
+        <input type="color" data-field="color" value="${slide.color}" />
+      </div>
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px;margin:14px 0 6px">Statements</div>`;
+
+    slide.statements.forEach((st, sti) => {
+      let curLabel;
+      if (st.type === 'feature') { fIdx++; curLabel = `Feature ${fIdx}`; }
+      else curLabel = STATEMENT_TYPES.find(t => t.key === st.type)?.label || 'Statement';
+      html += `<div class="edit-stmt-row" data-stmt-id="${st.id}">
+        <select data-stmt-field="type">
+          ${STATEMENT_TYPES.map(t => `<option value="${t.key}" ${st.type === t.key ? 'selected' : ''}>${t.label}</option>`).join('')}
+        </select>
+        <span class="stmt-label">${escapeHtml(curLabel)}</span>
+        <input type="text" data-stmt-field="text" value="${escapeHtml(st.text)}" />
+        <div style="display:flex;gap:4px">
+          <button class="btn tiny" data-stmt-action="up" ${sti === 0 ? 'disabled' : ''}>↑</button>
+          <button class="btn tiny" data-stmt-action="down" ${sti === slide.statements.length - 1 ? 'disabled' : ''}>↓</button>
+          <button class="btn tiny danger" data-stmt-action="delete">×</button>
+        </div>
+      </div>`;
+    });
+
+    html += `<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn tiny" data-action="add-feature">+ Feature</button>
+      <button class="btn tiny" data-action="add-quote">+ Quote</button>
+      <button class="btn tiny" data-action="add-promise">+ Promise</button>
+      <button class="btn tiny" data-action="add-price">+ Price</button>
+      <button class="btn tiny" data-action="add-custom">+ Custom statement</button>
+    </div></div>`;
+  });
+  wrap.innerHTML = html;
+
+  wrap.querySelectorAll('.edit-slide').forEach(sEl => {
+    const slideId = sEl.dataset.slideId;
+    const slide = c.slides.find(x => x.id === slideId);
+    sEl.querySelectorAll('input[data-field], select[data-field]').forEach(el => {
+      el.addEventListener('input', () => { slide[el.dataset.field] = el.value; save(); renderEditSlides(); });
+    });
+    sEl.querySelectorAll('button[data-action]').forEach(btn => {
+      btn.addEventListener('click', () => handleSlideAction(slide, btn.dataset.action));
+    });
+    sEl.querySelectorAll('.edit-stmt-row').forEach(row => {
+      const stmtId = row.dataset.stmtId;
+      const st = slide.statements.find(x => x.id === stmtId);
+      row.querySelectorAll('[data-stmt-field]').forEach(el => {
+        el.addEventListener('input', () => { st[el.dataset.stmtField] = el.value; save(); renderEditSlides(); });
+      });
+      row.querySelectorAll('button[data-stmt-action]').forEach(btn => {
+        btn.addEventListener('click', () => handleStmtAction(slide, st, btn.dataset.stmtAction));
+      });
+    });
+  });
+}
+function handleSlideAction(slide, action) {
+  const c = activeCycle();
+  const idx = c.slides.findIndex(s => s.id === slide.id);
+  if (action === 'up' && idx > 0) [c.slides[idx-1], c.slides[idx]] = [c.slides[idx], c.slides[idx-1]];
+  else if (action === 'down' && idx < c.slides.length - 1) [c.slides[idx+1], c.slides[idx]] = [c.slides[idx], c.slides[idx+1]];
+  else if (action === 'duplicate') {
+    const copy = JSON.parse(JSON.stringify(slide));
+    copy.id = uid(); copy.statements.forEach(s => s.id = uid());
+    c.slides.splice(idx + 1, 0, copy);
+  } else if (action === 'delete') {
+    if (!confirm('Delete this slide and all its reactions?')) return;
+    Object.keys(c.reactions).forEach(k => { if (k.includes('|' + slide.id + '|')) delete c.reactions[k]; });
+    c.slides.splice(idx, 1);
+    if (c.slides.length === 0) c.slides.push({ id: uid(), color: '#888', headline: 'New slide', statements: [] });
+    if (c.activeSlideId === slide.id) c.activeSlideId = c.slides[0].id;
+  }
+  else if (action === 'add-feature') slide.statements.push({ id: uid(), type: 'feature', text: '' });
+  else if (action === 'add-quote')   slide.statements.push({ id: uid(), type: 'quote',   text: '' });
+  else if (action === 'add-promise') slide.statements.push({ id: uid(), type: 'promise', text: '' });
+  else if (action === 'add-price')   slide.statements.push({ id: uid(), type: 'price',   text: '' });
+  else if (action === 'add-custom')  slide.statements.push({ id: uid(), type: 'custom',  text: '' });
+  save(); renderEditSlides();
+}
+function handleStmtAction(slide, st, action) {
+  const c = activeCycle();
+  const idx = slide.statements.findIndex(s => s.id === st.id);
+  if (action === 'up' && idx > 0) [slide.statements[idx-1], slide.statements[idx]] = [slide.statements[idx], slide.statements[idx-1]];
+  else if (action === 'down' && idx < slide.statements.length - 1) [slide.statements[idx+1], slide.statements[idx]] = [slide.statements[idx], slide.statements[idx+1]];
+  else if (action === 'delete') {
+    if (!confirm('Delete this statement and all its reactions?')) return;
+    Object.keys(c.reactions).forEach(k => { if (k.endsWith('|' + st.id)) delete c.reactions[k]; });
+    slide.statements.splice(idx, 1);
+  }
+  save(); renderEditSlides();
+}
+
+document.getElementById('add-slide').addEventListener('click', () => {
+  const c = activeCycle();
+  c.slides.push({ id: uid(), color: '#5e35b1', headline: 'New slide headline',
+    statements: [
+      { id: uid(), type: 'quote',   text: '' },
+      { id: uid(), type: 'promise', text: '' },
+      { id: uid(), type: 'feature', text: '' },
+      { id: uid(), type: 'price',   text: '' },
+    ]
+  });
+  save(); renderEditSlides();
+});
+
+document.getElementById('copy-from-cycle').addEventListener('click', () => {
+  if (state.cycles.length < 2) { showToast('Create another cycle first to copy from'); return; }
+  const others = state.cycles.filter(c => c.id !== state.activeCycleId);
+  const opts = others.map(c => `<option value="${c.id}">${escapeHtml(c.name)}</option>`).join('');
+  showModal(`<h3 style="margin-top:0">Copy slides from another cycle</h3>
+    <p style="color:var(--muted);font-size:13px">This replaces the slides in the current cycle. Existing reactions for slides that no longer exist will be lost.</p>
+    <select id="copy-source" style="width:100%;margin-bottom:14px">${opts}</select>
+    <div style="display:flex;justify-content:flex-end;gap:6px">
+      <button class="btn" id="copy-cancel">Cancel</button>
+      <button class="btn primary" id="copy-confirm">Copy slides</button>
+    </div>`);
+  document.getElementById('copy-cancel').addEventListener('click', closeModal);
+  document.getElementById('copy-confirm').addEventListener('click', () => {
+    const sourceId = document.getElementById('copy-source').value;
+    const source = state.cycles.find(c => c.id === sourceId);
+    if (!confirm('Replace current slides with a copy from ' + source.name + '?')) return;
+    const cur = activeCycle();
+    cur.slides = JSON.parse(JSON.stringify(source.slides));
+    cur.slides.forEach(s => { s.id = uid(); s.statements.forEach(x => x.id = uid()); });
+    cur.activeSlideId = cur.slides[0]?.id;
+    save(); closeModal(); renderEditSlides(); showToast('Slides copied');
+  });
+});
+
+/* ---- PARTICIPANTS ---- */
+function renderParticipants() {
+  const c = activeCycle();
+  const wrap = document.getElementById('participants-list');
+  wrap.innerHTML = c.participants.map(p => `
+    <div class="participant-row" data-pid="${p.id}">
+      <input type="text" data-field="label" placeholder="Label" value="${escapeHtml(p.label)}" style="max-width:120px" />
+      <input type="text" data-field="name" placeholder="Real name (optional)" value="${escapeHtml(p.name)}" />
+      <button class="btn tiny" data-action="up">↑</button>
+      <button class="btn tiny" data-action="down">↓</button>
+      <button class="btn tiny danger" data-action="delete">Delete</button>
+    </div>`).join('');
+  wrap.querySelectorAll('.participant-row').forEach(row => {
+    const p = c.participants.find(x => x.id === row.dataset.pid);
+    row.querySelectorAll('input').forEach(inp => {
+      inp.addEventListener('input', () => { p[inp.dataset.field] = inp.value; save(); });
+    });
+    row.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = c.participants.findIndex(x => x.id === p.id);
+        const action = btn.dataset.action;
+        if (action === 'up' && idx > 0) [c.participants[idx-1], c.participants[idx]] = [c.participants[idx], c.participants[idx-1]];
+        else if (action === 'down' && idx < c.participants.length - 1) [c.participants[idx+1], c.participants[idx]] = [c.participants[idx], c.participants[idx+1]];
+        else if (action === 'delete') {
+          if (c.participants.length === 1) { showToast('You need at least one participant'); return; }
+          if (!confirm(`Delete ${p.label}${p.name ? ' (' + p.name + ')' : ''} and all their reactions?`)) return;
+          Object.keys(c.reactions).forEach(k => { if (k.startsWith(p.id + '|')) delete c.reactions[k]; });
+          c.participants.splice(idx, 1);
+          if (c.activeParticipantId === p.id) c.activeParticipantId = c.participants[0].id;
+        }
+        save(); renderParticipants();
+      });
+    });
+  });
+}
+document.getElementById('add-participant').addEventListener('click', () => {
+  const c = activeCycle();
+  c.participants.push({ id: uid(), label: 'P' + (c.participants.length + 1), name: '' });
+  save(); renderParticipants();
+});
+
+/* ---- EXPORT ---- */
+document.getElementById('export-json').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `validation-tool-backup-${dateStamp()}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
+document.getElementById('export-csv-current').addEventListener('click', () => downloadCsv(activeCycle()));
+document.getElementById('export-summary-current').addEventListener('click', () => downloadSummary(activeCycle()));
+document.getElementById('import-json').addEventListener('click', () => document.getElementById('import-file-input').click());
+document.getElementById('import-file-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const imported = JSON.parse(await file.text());
+    if (!imported.cycles) throw new Error('Not a valid backup');
+    if (!confirm('Replace ALL current data with the imported backup?')) return;
+    state = imported;
+    if (!state.scoreMap) state.scoreMap = { ...DEFAULT_SCORE_MAP };
+    save(); renderCycleSelect(); setView(state.activeView || 'interview');
+    showToast('Backup imported');
+  } catch (err) { alert('Could not import: ' + err.message); }
+  e.target.value = '';
+});
+document.getElementById('reset-cycle-reactions').addEventListener('click', () => {
+  const c = activeCycle();
+  if (!confirm(`Clear all reactions and notes in "${c.name}"?`)) return;
+  c.reactions = {}; save(); setView(state.activeView); showToast('Reactions cleared');
+});
+document.getElementById('reset-everything').addEventListener('click', () => {
+  if (!confirm('This wipes EVERYTHING — cycles, participants, reactions, edits — and restores defaults. Sure?')) return;
+  state = defaultState();
+  save(); renderCycleSelect(); setView('interview'); showToast('Reset to defaults');
+});
+function renderExportPreview() {
+  document.getElementById('export-preview').textContent = buildSummaryText(activeCycle());
+}
+
+/* ---- CSV/SUMMARY ---- */
+function csvEscape(v) {
+  if (v === null || v === undefined) return '';
+  const s = String(v);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function downloadCsv(c) {
+  const lines = [];
+  const headerP = ['', ''].concat(c.participants.flatMap(p => [`${p.label}${p.name ? ' (' + p.name + ')' : ''} - Score`, `${p.label} - Notes`])).concat(['Total']);
+  lines.push(headerP.map(csvEscape).join(','));
+  for (const slide of c.slides) {
+    lines.push(['SLIDE', slide.headline].map(csvEscape).join(','));
+    addStatementCsvRow(lines, c, slide, { id: 'headline', type: 'headline', text: slide.headline }, 'Headline');
+    let fIdx = 0;
+    for (const st of slide.statements) {
+      let lbl;
+      if (st.type === 'feature') { fIdx++; lbl = `Feature ${fIdx}`; }
+      else lbl = STATEMENT_TYPES.find(t => t.key === st.type)?.label || 'Statement';
+      addStatementCsvRow(lines, c, slide, st, lbl);
+    }
+    lines.push('');
+  }
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${slugify(c.name)}-heatmap-${dateStamp()}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+function addStatementCsvRow(lines, c, slide, st, lbl) {
+  const cells = [lbl, st.text];
+  let total = 0;
+  for (const p of c.participants) {
+    const r = c.reactions[rkey(p.id, slide.id, st.id)];
+    const score = r?.reaction ? reactionToScore(r.reaction) : '';
+    if (score !== '') total += score;
+    cells.push(score, r?.phrases || '');
+  }
+  cells.push(total);
+  lines.push(cells.map(csvEscape).join(','));
+}
+function buildSummaryText(c) {
+  let out = `VALIDATION INTERVIEW SUMMARY — ${c.name}\n`;
+  out += `Captured: ${new Date().toLocaleString()}\n`;
+  out += `Participants: ${c.participants.map(p => p.label + (p.name ? ' (' + p.name + ')' : '')).join(', ')}\n`;
+  out += `Score map: ❤️=${state.scoreMap.love}, 👍=${state.scoreMap.like}, 👎=${state.scoreMap.dislike}\n`;
+  for (const slide of c.slides) {
+    out += `\n══════════════════════════════════════════\n`;
+    out += `${slide.headline.toUpperCase()}\n`;
+    out += `══════════════════════════════════════════\n`;
+    out += summaryStmt(c, slide, { id: 'headline', text: slide.headline }, 'Headline');
+    let fIdx = 0;
+    for (const st of slide.statements) {
+      let lbl;
+      if (st.type === 'feature') { fIdx++; lbl = `Feature ${fIdx}`; }
+      else lbl = STATEMENT_TYPES.find(t => t.key === st.type)?.label || 'Statement';
+      out += summaryStmt(c, slide, st, lbl);
+    }
+  }
+  return out;
+}
+function summaryStmt(c, slide, st, lbl) {
+  let out = `\n[${lbl}] ${st.text}\n`;
+  let total = 0;
+  for (const p of c.participants) {
+    const r = c.reactions[rkey(p.id, slide.id, st.id)];
+    const sym = reactionEmoji(r?.reaction) || '·';
+    const score = r?.reaction ? reactionToScore(r.reaction) : 0;
+    total += score;
+    const phrase = r?.phrases ? `  [note: "${r.phrases}"]` : '';
+    const pName = p.label + (p.name ? ' (' + p.name + ')' : '');
+    out += `  ${sym}  ${pName} (${score >= 0 ? '+' : ''}${score})${phrase}\n`;
+  }
+  out += `  Σ total: ${total >= 0 ? '+' : ''}${total}\n`;
+  return out;
+}
+function downloadSummary(c) {
+  const blob = new Blob([buildSummaryText(c)], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${slugify(c.name)}-summary-${dateStamp()}.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+/* ---- STANDALONE PARTICIPANT HTML BUILDER ---- */
+function buildStandaloneParticipantHtml(slides, cycleName, scoreMap) {
+  const slidesJson = JSON.stringify(slides);
+  const cycleNameJson = JSON.stringify(cycleName || '');
+  const scoreMapJson = JSON.stringify(scoreMap || { love: 3, like: 1, dislike: -1 });
+  const titleEsc = escapeHtml(cycleName || 'Validation Interview');
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${titleEsc} — Reactions</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#fafbfc;color:#1b1d22;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;line-height:1.4;font-size:14px}
+.shell{max-width:760px;margin:0 auto;padding:20px 16px 80px}
+.card{background:#fff;border-radius:14px;box-shadow:0 4px 16px rgba(20,20,30,0.06)}
+.welcome{padding:28px;text-align:center}
+.welcome h1{margin:0 0 8px;font-size:26px}
+.welcome p{color:#6b6f76;margin:0 0 16px;line-height:1.5}
+.welcome input{width:100%;max-width:320px;padding:10px 14px;font-size:16px;border:1px solid #e3e6ea;border-radius:8px;margin-bottom:16px}
+.btn{padding:10px 18px;border-radius:10px;border:1px solid #e3e6ea;background:#fff;cursor:pointer;font-size:14px;font-weight:600;color:#1b1d22}
+.btn:hover{background:#f8f9fb}
+.btn.primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+.btn.primary:hover{background:#333}
+.btn.big{font-size:16px;padding:12px 28px}
+.btn:disabled{opacity:0.4;cursor:not-allowed}
+.progress{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:18px;font-size:13px;color:#6b6f76;font-weight:600}
+.dots{display:flex;gap:6px}
+.dot{width:9px;height:9px;border-radius:50%;background:#cfd4da}
+.dot.done{background:#7fc88f}
+.dot.active{background:#1b1d22}
+.slide{padding:28px 28px 18px;border-top:8px solid var(--accent,#888)}
+.slide h2{color:var(--accent);font-size:28px;line-height:1.2;margin:0 0 16px;font-weight:800}
+.stmt{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 16px;margin-bottom:10px;border-radius:10px;background:#fafbfc;border:1px solid #e3e6ea;flex-wrap:wrap}
+.stmt.has{background:#fff;border-color:#b8c2cf}
+.stmt-text{flex:1;font-size:16px;line-height:1.45;min-width:180px}
+.stmt-text.headline{font-weight:700}
+.stmt-text.quote{font-style:italic;font-weight:600}
+.stmt-text.promise{font-style:italic}
+.stmt-text.price{font-weight:600}
+.rxn{display:flex;gap:6px}
+.rxn button{width:50px;height:50px;font-size:22px;border-radius:12px;border:2px solid #e3e6ea;background:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;transition:transform 0.12s}
+.rxn button:hover{transform:scale(1.06)}
+.rxn button.active.love{background:#ffe4e7;border-color:#c62828;transform:scale(1.1)}
+.rxn button.active.like{background:#e6f4ea;border-color:#2e7d32;transform:scale(1.1)}
+.rxn button.active.dislike{background:#fdecea;border-color:#b71c1c;transform:scale(1.1)}
+.nav{display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:10px;flex-wrap:wrap}
+.done{padding:32px;text-align:center}
+.done h2{margin:0 0 10px}
+.code-box{background:#f6f7f9;border:1px solid #e3e6ea;padding:14px;border-radius:10px;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:12px;word-break:break-all;text-align:left;margin:16px 0;max-height:180px;overflow-y:auto}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a1a1a;color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;opacity:0;transition:all 0.25s ease;pointer-events:none;z-index:100}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+@media (max-width:720px){.slide h2{font-size:22px}.stmt{flex-direction:column;align-items:stretch}.rxn{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<div class="shell" id="root"></div>
+<div class="toast" id="toast"></div>
+<script>
+const SLIDES = ${slidesJson};
+const CYCLE_NAME = ${cycleNameJson};
+const SCORE_MAP = ${scoreMapJson};
+const STORAGE_KEY = 'validation-pp-' + (CYCLE_NAME || 'untitled') + '-' + (SLIDES[0] && SLIDES[0].id || 'x');
+
+let pp = (() => {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { name: '', reactions: {}, idx: -1 }; }
+  catch { return { name: '', reactions: {}, idx: -1 }; }
+})();
+function ppSave() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pp)); } catch (e) {} }
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+function encodePayload(obj) {
+  const json = JSON.stringify(obj);
+  const bytes = new TextEncoder().encode(json);
+  let bin = '';
+  bytes.forEach(b => bin += String.fromCharCode(b));
+  return btoa(bin).replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=+$/, '');
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+const root = document.getElementById('root');
+
+function render() {
+  if (pp.idx === -1) renderWelcome();
+  else if (pp.idx >= SLIDES.length) renderDone();
+  else renderSlide(SLIDES[pp.idx], pp.idx);
+}
+
+function renderWelcome() {
+  const n = SLIDES.length;
+  root.innerHTML = '<div class="card welcome">' +
+    '<h1>Hi! 👋 Thanks for helping out.</h1>' +
+    '<p style="margin-bottom:18px">This takes about <strong>3 minutes</strong>. Here\\'s how it works:</p>' +
+    '<div style="text-align:left;max-width:420px;margin:0 auto 22px;font-size:15px;line-height:1.7">' +
+      '<div style="display:flex;gap:12px;margin-bottom:10px"><span style="font-size:22px;flex-shrink:0">1️⃣</span><div><strong>Read each slide.</strong> There ' + (n === 1 ? 'is 1 slide' : 'are ' + n + ' slides') + ' total.</div></div>' +
+      '<div style="display:flex;gap:12px;margin-bottom:10px"><span style="font-size:22px;flex-shrink:0">2️⃣</span><div><strong>Tap one emoji</strong> next to each line:<br>' +
+        '<span style="font-size:20px">❤️</span> super positive &nbsp;' +
+        '<span style="font-size:20px">👍</span> positive &nbsp;' +
+        '<span style="font-size:20px">👎</span> negative<br>' +
+        '<span style="font-size:13px;color:#6b6f76">Skip any lines you don\\'t have an opinion on. There are no wrong answers.</span></div></div>' +
+      '<div style="display:flex;gap:12px"><span style="font-size:22px;flex-shrink:0">3️⃣</span><div><strong>Send your reactions back</strong> at the end with one tap (Messages, WhatsApp, email — whatever\\'s easiest).</div></div>' +
+    '</div>' +
+    '<input type="text" id="pp-name" placeholder="Your name (optional)" value="' + esc(pp.name) + '" />' +
+    '<div><button class="btn primary big" id="pp-start">Let\\'s go →</button></div>' +
+    (CYCLE_NAME ? '<p style="margin-top:18px;font-size:12px;color:#6b6f76">Topic: ' + esc(CYCLE_NAME) + '</p>' : '') +
+    '</div>';
+  document.getElementById('pp-name').addEventListener('input', e => { pp.name = e.target.value; ppSave(); });
+  document.getElementById('pp-start').addEventListener('click', () => { pp.idx = 0; ppSave(); render(); window.scrollTo({top:0}); });
+}
+
+function renderSlide(slide, idx) {
+  const dots = SLIDES.map((_, i) =>
+    '<span class="dot ' + (i === idx ? 'active' : (i < idx ? 'done' : '')) + '"></span>'
+  ).join('');
+  let html = '<div class="progress"><span>Slide ' + (idx + 1) + ' of ' + SLIDES.length + '</span><div class="dots">' + dots + '</div></div>';
+  html += '<div class="card slide" style="--accent:' + slide.color + '"><h2>' + esc(slide.headline) + '</h2>';
+  html += renderStmt({ id: slide.id + '|headline', text: slide.headline, type: 'headline' });
+  for (const st of slide.statements) {
+    if (!st.text || !st.text.trim()) continue;
+    html += renderStmt(st);
+  }
+  html += '</div>';
+  html += '<div class="nav"><button class="btn" id="pp-prev"' + (idx === 0 ? ' disabled' : '') + '>← Previous</button>' +
+          '<button class="btn primary" id="pp-next">' + (idx === SLIDES.length - 1 ? 'Done →' : 'Next slide →') + '</button></div>';
+  root.innerHTML = html;
+  root.querySelectorAll('.rxn button').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const k = btn.dataset.k, r = btn.dataset.r;
+      if (pp.reactions[k] === r) delete pp.reactions[k];
+      else pp.reactions[k] = r;
+      ppSave(); render();
+    });
+  });
+  document.getElementById('pp-prev').addEventListener('click', () => { if (pp.idx > 0) { pp.idx--; ppSave(); render(); window.scrollTo({top:0}); } });
+  document.getElementById('pp-next').addEventListener('click', () => { pp.idx++; ppSave(); render(); window.scrollTo({top:0}); });
+}
+
+function renderStmt(st) {
+  const r = pp.reactions[st.id] || null;
+  return '<div class="stmt ' + (r ? 'has' : '') + '">' +
+    '<div class="stmt-text ' + st.type + '">' + esc(st.text) + '</div>' +
+    '<div class="rxn">' +
+      '<button class="love ' + (r === 'love' ? 'active' : '') + '" data-k="' + st.id + '" data-r="love" aria-label="super positive">❤️</button>' +
+      '<button class="like ' + (r === 'like' ? 'active' : '') + '" data-k="' + st.id + '" data-r="like" aria-label="positive">👍</button>' +
+      '<button class="dislike ' + (r === 'dislike' ? 'active' : '') + '" data-k="' + st.id + '" data-r="dislike" aria-label="negative">👎</button>' +
+    '</div></div>';
+}
+
+function renderDone() {
+  const v2Payload = {
+    name: pp.name,
+    v: 2,
+    data: SLIDES.map(slide => ({
+      h: slide.headline,
+      i: slide.id,
+      hr: pp.reactions[slide.id + '|headline'] || null,
+      s: slide.statements.map(st => ({
+        t: st.text,
+        i: st.id,
+        r: pp.reactions[st.id] || null
+      }))
+    }))
+  };
+  const code = 'RXN-' + encodePayload(v2Payload);
+  const counts = Object.values(pp.reactions).reduce((a, r) => { a[r] = (a[r] || 0) + 1; return a; }, {});
+  const shareMsg = 'Validation interview reactions' + (pp.name ? ' from ' + pp.name : '') + ': ' + code;
+  const smsHref = 'sms:?&body=' + encodeURIComponent(shareMsg);
+  const mailHref = 'mailto:?subject=' + encodeURIComponent('Validation interview reactions') + '&body=' + encodeURIComponent(shareMsg);
+  const canShare = !!navigator.share;
+  root.innerHTML = '<div class="card done">' +
+    '<h2>You\\'re done! 🙌</h2>' +
+    '<div style="font-size:24px;margin:10px 0 4px">' +
+      (counts.love ? '❤️ ' + counts.love : '') + ' &nbsp; ' +
+      (counts.like ? '👍 ' + counts.like : '') + ' &nbsp; ' +
+      (counts.dislike ? '👎 ' + counts.dislike : '') +
+    '</div>' +
+    '<p style="color:#6b6f76;margin:6px 0 4px">' + (pp.name ? 'Thanks, ' + esc(pp.name) + '!' : 'Thank you!') + '</p>' +
+    '<div style="background:#fff8e1;border:1px solid #f1c40f;padding:12px 16px;border-radius:10px;margin:14px auto 14px;max-width:440px;text-align:left;font-size:14px;line-height:1.5">' +
+      '<strong>👉 One more step:</strong> Send your reactions back to the interviewer. Pick whichever\\'s easiest:' +
+    '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px">' +
+      (canShare ? '<button class="btn primary big" id="pp-share">📤 Share (Messages, WhatsApp…)</button>' : '') +
+      '<a class="btn primary big" href="' + smsHref + '" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">💬 Send as text message</a>' +
+      '<a class="btn" href="' + mailHref + '" style="text-decoration:none;display:inline-flex;align-items:center;justify-content:center">📧 Send by email</a>' +
+    '</div>' +
+    '<p style="font-size:13px;color:#6b6f76;margin:10px 0 0">Once you\\'ve sent it, you can close this page.</p>' +
+    '<details style="margin-top:14px;text-align:left;max-width:520px;margin-left:auto;margin-right:auto"><summary style="cursor:pointer;color:#6b6f76;font-size:13px;text-align:center">Or copy the code manually to paste somewhere</summary>' +
+      '<div class="code-box" id="pp-code" style="margin-top:8px">' + esc(code) + '</div>' +
+      '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">' +
+        '<button class="btn" id="pp-copy">📋 Copy code</button>' +
+        '<button class="btn" id="pp-download">⬇ Download as file</button>' +
+      '</div></details>' +
+    '<div style="margin-top:22px"><button class="btn" id="pp-back" style="font-size:13px">← Go back to change a reaction</button></div>' +
+    '</div>';
+  if (canShare) {
+    document.getElementById('pp-share').addEventListener('click', async () => {
+      try { await navigator.share({ title: 'Validation interview reactions', text: shareMsg }); }
+      catch (e) {
+        if (e.name !== 'AbortError') {
+          try { await navigator.clipboard.writeText(code); toast('Code copied'); }
+          catch { toast('Share cancelled'); }
+        }
+      }
+    });
+  }
+  document.getElementById('pp-copy').addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(code); toast('Code copied'); }
+    catch { toast('Copy failed — select the code and copy manually'); }
+  });
+  document.getElementById('pp-download').addEventListener('click', () => {
+    const blob = new Blob([JSON.stringify(v2Payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'reactions-' + (pp.name || 'participant').replace(/[^a-z0-9]+/gi, '-').toLowerCase() + '.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+  });
+  document.getElementById('pp-back').addEventListener('click', () => { pp.idx = SLIDES.length - 1; ppSave(); render(); });
+}
+
+render();
+<\/script>
+</body>
+</html>`;
+}
+
+/* ---- INIT ---- */
+rerenderInterviewer = function () {
+  renderCycleSelect();
+  setView(state.activeView || 'interview');
+};
+renderCycleSelect();
+setView(state.activeView || 'interview');
+
+} // end initInterviewerMode
+
+/* ============================================================
+   ============================================================
+   PARTICIPANT MODE
+   ============================================================
+   ============================================================ */
+async function initParticipantMode() {
+  const root = document.getElementById('participant-ui');
+  const params = new URLSearchParams(window.location.search);
+  const dataParam = params.get('data');
+  const localMode = params.get('local') === '1';
+  const ppParam = params.get('pp');
+
+  let slides, cycleName = '', scoreMap = { ...DEFAULT_SCORE_MAP }, ppName = '';
+  let targetParticipantId = null;
+
+  if (localMode) {
+    const cyc = activeCycle();
+    if (!cyc || !cyc.slides) { root.innerHTML = '<div class="pp-welcome"><h1>No slides found</h1><p>Ask the interviewer to set up the slides first.</p></div>'; return; }
+    slides = JSON.parse(JSON.stringify(cyc.slides));
+    cycleName = cyc.name;
+    scoreMap = state.scoreMap;
+    targetParticipantId = ppParam || cyc.activeParticipantId;
+  } else if (dataParam) {
+    try {
+      const decoded = await decodePayloadCompressed(dataParam);
+      slides = decoded.slides;
+      cycleName = decoded.cycleName || '';
+      if (decoded.scoreMap) scoreMap = decoded.scoreMap;
+    } catch (e) {
+      root.innerHTML = `<div class="pp-welcome"><h1>Couldn't load slides</h1><p>The link looks broken. Ask the interviewer for a fresh one.</p></div>`;
+      return;
+    }
+  } else {
+    root.innerHTML = `<div class="pp-welcome"><h1>Hello!</h1><p>This page is meant to be opened from a link sent by your interviewer. If you reached it on your own, please ask them for the correct link.</p></div>`;
+    return;
+  }
+
+  // Restore any partial in-progress reactions (per-link or per-localPpId)
+  const sessionKey = PP_STORAGE_KEY + ':' + (localMode ? ('local-' + targetParticipantId) : ('link-' + dataParam.slice(0, 16)));
+  let ppState = (() => {
+    try { return JSON.parse(localStorage.getItem(sessionKey)) || { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
+    catch { return { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
+  })();
+  function ppSave() { try { localStorage.setItem(sessionKey, JSON.stringify(ppState)); } catch (e) {} }
+
+  function rxnEmoji(r) { return r === 'love' ? '❤️' : r === 'like' ? '👍' : r === 'dislike' ? '👎' : ''; }
+
+  function syncToInterviewerLocalStorage() {
+    if (!localMode || !targetParticipantId) return;
+    const cyc = activeCycle();
+    if (!cyc) return;
+    for (const slide of cyc.slides) {
+      const headlineKey = slide.id + '|headline';
+      if (ppState.reactions[headlineKey] !== undefined) {
+        const k = rkey(targetParticipantId, slide.id, 'headline');
+        const cur = cyc.reactions[k] || {};
+        cur.reaction = ppState.reactions[headlineKey] || null;
+        cyc.reactions[k] = cur;
+      }
+      for (const st of slide.statements) {
+        if (ppState.reactions[st.id] !== undefined) {
+          const k = rkey(targetParticipantId, slide.id, st.id);
+          const cur = cyc.reactions[k] || {};
+          cur.reaction = ppState.reactions[st.id] || null;
+          cyc.reactions[k] = cur;
+        }
+      }
+    }
+    save();
+  }
+
+  function render() {
+    if (ppState.currentIdx === -1) { renderWelcome(); return; }
+    if (ppState.currentIdx >= slides.length) { renderDone(); return; }
+    renderSlide(slides[ppState.currentIdx], ppState.currentIdx);
+  }
+
+  function renderWelcome() {
+    const slideCount = slides.length;
+    root.innerHTML = `
+      <div class="pp-welcome">
+        <h1>Hi! 👋 Thanks for helping out.</h1>
+        <p style="margin-bottom:18px">This takes about <strong>3 minutes</strong>. Here's how it works:</p>
+        <div style="text-align:left;max-width:420px;margin:0 auto 22px;font-size:15px;line-height:1.7">
+          <div style="display:flex;gap:12px;margin-bottom:10px"><span style="font-size:22px;flex-shrink:0">1️⃣</span><div><strong>Read each slide.</strong> There ${slideCount === 1 ? 'is 1 slide' : 'are ' + slideCount + ' slides'} total.</div></div>
+          <div style="display:flex;gap:12px;margin-bottom:10px"><span style="font-size:22px;flex-shrink:0">2️⃣</span><div><strong>Tap one emoji</strong> next to each line:<br>
+            <span style="font-size:20px">❤️</span> super positive &nbsp;
+            <span style="font-size:20px">👍</span> positive &nbsp;
+            <span style="font-size:20px">👎</span> negative<br>
+            <span style="font-size:13px;color:var(--muted)">Skip any lines you don't have an opinion on. There are no wrong answers.</span></div></div>
+          <div style="display:flex;gap:12px"><span style="font-size:22px;flex-shrink:0">3️⃣</span><div><strong>Send your reactions back</strong> at the end with one tap (Messages, WhatsApp, email — whatever's easiest).</div></div>
+        </div>
+        <input type="text" id="pp-name" placeholder="Your name (optional)" value="${escapeHtml(ppState.name)}" />
+        <div><button class="btn primary" id="pp-start" style="font-size:17px;padding:14px 32px;border-radius:10px">Let's go →</button></div>
+        ${cycleName ? `<p style="margin-top:18px;font-size:12px;color:var(--muted)">Topic: ${escapeHtml(cycleName)}</p>` : ''}
+      </div>`;
+    document.getElementById('pp-name').addEventListener('input', e => { ppState.name = e.target.value; ppSave(); });
+    document.getElementById('pp-start').addEventListener('click', () => { ppState.currentIdx = 0; ppSave(); render(); window.scrollTo({top:0}); });
+  }
+
+  function renderSlide(slide, idx) {
+    const dots = slides.map((_, i) =>
+      `<span class="pp-dot ${i === idx ? 'active' : (i < idx ? 'done' : '')}"></span>`
+    ).join('');
+
+    let html = `<div class="pp-progress">
+      <span>Slide ${idx + 1} of ${slides.length}</span>
+      <div class="pp-dots">${dots}</div>
+    </div>
+    <div class="pp-slide" style="--slide-accent:${slide.color}">
+      <h2>${escapeHtml(slide.headline)}</h2>`;
+
+    html += renderPpStmt({ id: slide.id + '|headline', text: slide.headline, type: 'headline' });
+    let fIdx = 0;
+    for (const st of slide.statements) {
+      // Skip empty statements (allows interviewer to leave gaps without spam)
+      if (!st.text || !st.text.trim()) continue;
+      html += renderPpStmt(st);
+    }
+    html += `</div>
+    <div class="pp-nav">
+      <button id="pp-prev" ${idx === 0 ? 'disabled' : ''}>← Previous</button>
+      <button class="primary" id="pp-next">${idx === slides.length - 1 ? 'Done →' : 'Next slide →'}</button>
+    </div>`;
+    root.innerHTML = html;
+
+    root.querySelectorAll('.pp-rxn button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const stKey = btn.dataset.stKey;
+        const rxn = btn.dataset.rxn;
+        if (ppState.reactions[stKey] === rxn) {
+          delete ppState.reactions[stKey]; // toggle off
+        } else {
+          ppState.reactions[stKey] = rxn;
+        }
+        ppSave();
+        syncToInterviewerLocalStorage();
+        render();
+      });
+    });
+    document.getElementById('pp-prev').addEventListener('click', () => { if (ppState.currentIdx > 0) { ppState.currentIdx--; ppSave(); render(); window.scrollTo({top:0}); } });
+    document.getElementById('pp-next').addEventListener('click', () => { ppState.currentIdx++; ppSave(); render(); window.scrollTo({top:0}); });
+  }
+
+  function renderPpStmt(st) {
+    const r = ppState.reactions[st.id] || null;
+    const cls = 'is-' + st.type;
+    return `<div class="pp-stmt ${r ? 'has-reaction' : ''}">
+      <div class="pp-stmt-text ${cls}">${escapeHtml(st.text)}</div>
+      <div class="pp-rxn">
+        <button class="love ${r === 'love' ? 'active' : ''}" data-st-key="${st.id}" data-rxn="love" aria-label="super positive">❤️</button>
+        <button class="like ${r === 'like' ? 'active' : ''}" data-st-key="${st.id}" data-rxn="like" aria-label="positive">👍</button>
+        <button class="dislike ${r === 'dislike' ? 'active' : ''}" data-st-key="${st.id}" data-rxn="dislike" aria-label="negative">👎</button>
+      </div>
+    </div>`;
+  }
+
+  function renderDone() {
+    syncToInterviewerLocalStorage();
+    if (localMode) {
+      root.innerHTML = `<div class="pp-done-screen">
+        <h2>Thanks! 🙌</h2>
+        <p style="color:var(--muted)">Your reactions have been saved. You can hand the device back to the interviewer.</p>
+        <p style="margin-top:18px"><button class="btn" id="pp-back">← Back to slides</button></p>
+      </div>`;
+      document.getElementById('pp-back').addEventListener('click', () => { ppState.currentIdx = slides.length - 1; ppSave(); render(); });
+      return;
+    }
+
+    // Cross-device: produce a v2 code (with slide text for cross-version matching)
+    const payload = {
+      name: ppState.name,
+      v: 2,
+      data: slides.map(slide => ({
+        h: slide.headline,
+        i: slide.id,
+        hr: ppState.reactions[slide.id + '|headline'] || null,
+        s: slide.statements.map(st => ({
+          t: st.text,
+          i: st.id,
+          r: ppState.reactions[st.id] || null
+        }))
+      }))
+    };
+    const code = 'RXN-' + encodePayload(payload);
+    const counts = Object.values(ppState.reactions).reduce((acc, r) => { acc[r] = (acc[r] || 0) + 1; return acc; }, {});
+    const shareMsg = `Validation interview reactions${ppState.name ? ' from ' + ppState.name : ''}: ${code}`;
+    const smsHref = 'sms:?&body=' + encodeURIComponent(shareMsg);
+    const mailHref = 'mailto:?subject=' + encodeURIComponent('Validation interview reactions') + '&body=' + encodeURIComponent(shareMsg);
+    const canShare = !!navigator.share;
+    root.innerHTML = `<div class="pp-done-screen">
+      <h2>You're done! 🙌</h2>
+      <div style="font-size:24px;margin:10px 0 4px">
+        ${counts.love ? `❤️ ${counts.love}` : ''} &nbsp;
+        ${counts.like ? `👍 ${counts.like}` : ''} &nbsp;
+        ${counts.dislike ? `👎 ${counts.dislike}` : ''}
+      </div>
+      <p style="color:var(--muted);margin:6px 0 4px">${ppState.name ? 'Thanks, ' + escapeHtml(ppState.name) + '!' : 'Thank you!'}</p>
+      <div style="background:#fff8e1;border:1px solid #f1c40f;padding:12px 16px;border-radius:10px;margin:14px auto 14px;max-width:440px;text-align:left;font-size:14px;line-height:1.5">
+        <strong>👉 One more step:</strong> Send your reactions back to the interviewer. Pick whichever's easiest:
+      </div>
+      <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px">
+        ${canShare ? '<button class="btn primary" id="pp-share" style="font-size:16px;padding:14px 22px">📤 Share (Messages, WhatsApp…)</button>' : ''}
+        <a class="btn primary" href="${smsHref}" style="font-size:16px;padding:14px 22px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center">💬 Send as text message</a>
+        <a class="btn" href="${mailHref}" style="font-size:15px;padding:12px 18px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center">📧 Send by email</a>
+      </div>
+      <p style="font-size:13px;color:var(--muted);margin:10px 0 0">Once you've sent it, you can close this page.</p>
+      <details style="margin-top:14px;text-align:left;max-width:520px;margin-left:auto;margin-right:auto">
+        <summary style="cursor:pointer;color:var(--muted);font-size:13px;text-align:center">Or copy the code manually to paste somewhere</summary>
+        <div class="code-box" id="pp-code" style="margin-top:8px">${escapeHtml(code)}</div>
+        <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+          <button class="btn" id="pp-copy">📋 Copy code</button>
+          <button class="btn" id="pp-download">⬇ Download as file</button>
+        </div>
+      </details>
+      <div style="margin-top:22px"><button class="btn" id="pp-back2" style="font-size:13px">← Go back to change a reaction</button></div>
+    </div>`;
+    if (canShare) {
+      document.getElementById('pp-share').addEventListener('click', async () => {
+        try {
+          await navigator.share({ title: 'Validation interview reactions', text: shareMsg });
+        } catch (e) {
+          if (e.name !== 'AbortError') {
+            try { await navigator.clipboard.writeText(code); ppToast('Code copied to clipboard'); }
+            catch { ppToast('Share cancelled'); }
+          }
+        }
+      });
+    }
+    document.getElementById('pp-copy').addEventListener('click', async () => {
+      try { await navigator.clipboard.writeText(code); ppToast('Code copied'); }
+      catch { ppToast('Copy failed — select & copy manually'); }
+    });
+    document.getElementById('pp-download').addEventListener('click', () => {
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `reactions-${(ppState.name || 'participant').replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    });
+    document.getElementById('pp-back2').addEventListener('click', () => { ppState.currentIdx = slides.length - 1; ppSave(); render(); });
+  }
+
+  function ppToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 1800);
+  }
+
+  render();
+}
+
+/* ============================================================
+   SHARED UTILITIES
+   ============================================================ */
+const modalBack = document.getElementById('modal-back');
+const modalBody = document.getElementById('modal-body');
+function showModal(html) { modalBody.innerHTML = html; modalBack.classList.add('show'); }
+function closeModal() { modalBack.classList.remove('show'); modalBody.innerHTML = ''; }
+modalBack.addEventListener('click', (e) => { if (e.target === modalBack) closeModal(); });
+
+function escapeHtml(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[ch]));
+}
+function dateStamp() { return new Date().toISOString().slice(0,10); }
+function slugify(s) { return String(s).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 1800);
+}
+</script>
+</body>
+</html>
