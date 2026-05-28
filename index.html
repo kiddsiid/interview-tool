@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Validation Interview Tool — Reactions + Heatmap</title>
+<title>Reactioner — Capture customer reactions to your value props</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
@@ -49,8 +49,16 @@
     gap: 10px;
     margin-bottom: 14px;
   }
-  .topbar-title { font-weight: 700; font-size: 16px; color: var(--muted); letter-spacing: 0.3px; }
+  .topbar-title { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+  .brand-name { font-weight: 800; font-size: 19px; color: var(--text); letter-spacing: 0.6px; }
+  .brand-tagline { font-weight: 400; font-size: 12px; color: var(--muted); line-height: 1.35; max-width: 560px; }
   .topbar-right { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .stmt-hint { font-style: italic; color: var(--muted); font-size: 12px; line-height: 1.4; margin: 3px 0 8px 0; }
+  .interview-howto { background: var(--soft); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 14px; font-size: 13px; line-height: 1.5; color: var(--text); }
+  .interview-howto summary { cursor: pointer; font-weight: 600; color: var(--text); }
+  .interview-howto[open] summary { margin-bottom: 8px; }
+  .interview-howto ol { margin: 6px 0 0 20px; padding: 0; }
+  .interview-howto li { margin-bottom: 4px; }
 
   .tabs {
     display: flex;
@@ -631,7 +639,10 @@
 <div class="container" id="interviewer-ui">
 
   <div class="topbar">
-    <div class="topbar-title">VALIDATION INTERVIEW TOOL · interviewer side</div>
+    <div class="topbar-title">
+      <div class="brand-name">REACTIONER</div>
+      <div class="brand-tagline">Capture ❤️ / 👍 / 👎 reactions to your value props during customer interviews — read each line aloud, watch the heatmap reveal what actually resonates.</div>
+    </div>
     <div class="topbar-right">
       <label class="field-label" style="margin:0">Cycle:</label>
       <select id="cycle-select"></select>
@@ -652,6 +663,16 @@
 
   <!-- ============ INTERVIEW TAB ============ -->
   <div id="view-interview">
+    <details class="interview-howto">
+      <summary>How to run a Reactioner interview</summary>
+      <ol>
+        <li>Pick the participant slot below (and optionally type their real name).</li>
+        <li>For each slide, read the items aloud in order — problem, quote, promise, feature, price.</li>
+        <li>After each one, ask their honest gut reaction (❤️ love / 👍 like / 👎 dislike) and tap the matching button. The notes box is private to you.</li>
+        <li>Move to the next slide once every reaction is captured.</li>
+        <li>When done, open the <strong>🔥 Heatmap</strong> tab to see what landed across all participants, or <strong>🔗 Share with participant</strong> to send the slides to someone to react on their own phone.</li>
+      </ol>
+    </details>
     <div class="panel">
       <div class="ctx-bar">
         <div>
@@ -853,8 +874,8 @@ const DEFAULT_SCORE_MAP = { love: 3, like: 1, dislike: -1 };
    in LOCAL-ONLY mode: data stays in this browser and there is
    no sign-in (exactly how it worked before).
    ============================================================ */
-const SUPABASE_URL = 'https://hrgzrreazmvimsqyaumb.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhyZ3pycmVhem12aW1zcXlhdW1iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3NTQ2NzIsImV4cCI6MjA5NTMzMDY3Mn0.9mlmkRm0xDUFiXvdnTnidjY8OQ2Feekxr1UcNSkHHs0';
+const SUPABASE_URL = 'https://nxbasaeysxarbavomjha.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im54YmFzYWV5c3hhcmJhdm9tamhhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk5OTk3MjcsImV4cCI6MjA5NTU3NTcyN30.qfIbEZ2S2cpwQZKQQ2uM3_I6c5CVaj4-JhN-E1bgeB0';
 
 function cloudConfigured() {
   return typeof SUPABASE_URL === 'string'
@@ -907,10 +928,15 @@ function readLocalCache(uid) {
   + '#vit-auth-logo{font-size:17px;font-weight:700;color:var(--text,#1b1d22);margin-bottom:6px}'
   + '#vit-auth-sub{font-size:13px;line-height:1.5;color:var(--muted,#6b6f76);margin:0 0 18px}'
   + '#vit-auth-form{display:flex;flex-direction:column;gap:10px}'
-  + '#vit-auth-email{padding:11px 12px;border:1px solid var(--border,#e3e6ea);border-radius:8px;font-size:14px;outline:none}'
-  + '#vit-auth-email:focus{border-color:var(--accent,#1a1a1a)}'
-  + '#vit-auth-btn{padding:11px 12px;border:none;border-radius:8px;background:var(--accent,#1a1a1a);color:#fff;font-size:14px;font-weight:600;cursor:pointer}'
-  + '#vit-auth-btn:disabled{opacity:.6;cursor:default}'
+  + '#vit-auth-email,#vit-auth-password{padding:11px 12px;border:1px solid var(--border,#e3e6ea);border-radius:8px;font-size:14px;outline:none;font-family:inherit}'
+  + '#vit-auth-email:focus,#vit-auth-password:focus{border-color:var(--accent,#1a1a1a)}'
+  + '#vit-auth-btn-row{display:flex;gap:8px;margin-top:2px}'
+  + '#vit-auth-signin{flex:1;padding:11px 12px;border:none;border-radius:8px;background:var(--accent,#1a1a1a);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}'
+  + '#vit-auth-signup{flex:1;padding:11px 12px;border:1px solid var(--border,#e3e6ea);border-radius:8px;background:#fff;color:var(--text,#1b1d22);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}'
+  + '#vit-auth-signin:disabled,#vit-auth-signup:disabled{opacity:.6;cursor:default}'
+  + '#vit-auth-signup:hover:not(:disabled){background:var(--soft,#f8f9fb)}'
+  + '#vit-auth-reset{display:block;margin-top:10px;font-size:12px;color:var(--muted,#6b6f76);text-align:center;text-decoration:none;cursor:pointer;background:none;border:none;padding:0;font-family:inherit;width:100%}'
+  + '#vit-auth-reset:hover{color:var(--text,#1b1d22);text-decoration:underline}'
   + '#vit-auth-msg{margin-top:14px;font-size:13px;line-height:1.5}'
   + '#vit-auth-msg.ok{color:#2e7d32}'
   + '#vit-auth-msg.err{color:#b71c1c}'
@@ -926,18 +952,23 @@ function readLocalCache(uid) {
   document.head.appendChild(tag);
 })();
 
-/* ---- sign-in screen ---- */
+/* ---- sign-in screen (email + password) ---- */
 function buildAuthGate() {
   if (authGateEl) return authGateEl;
   const gate = document.createElement('div');
   gate.id = 'vit-auth-gate';
   gate.innerHTML =
     '<div id="vit-auth-card">'
-    + '<div id="vit-auth-logo">Validation Interview Tool</div>'
-    + '<p id="vit-auth-sub">Sign in to open your interviews. We will email you a one-time sign-in link — no password to create or remember.</p>'
+    + '<div id="vit-auth-logo">Reactioner</div>'
+    + '<p id="vit-auth-sub">Sign in to open your interviews, or create a new account.</p>'
     + '<form id="vit-auth-form">'
     +   '<input id="vit-auth-email" type="email" required placeholder="you@example.com" autocomplete="email" />'
-    +   '<button id="vit-auth-btn" type="submit">Email me a sign-in link</button>'
+    +   '<input id="vit-auth-password" type="password" required minlength="6" placeholder="Password (min 6 characters)" autocomplete="current-password" />'
+    +   '<div id="vit-auth-btn-row">'
+    +     '<button id="vit-auth-signin" type="submit">Sign in</button>'
+    +     '<button id="vit-auth-signup" type="button">Create account</button>'
+    +   '</div>'
+    +   '<button id="vit-auth-reset" type="button">Forgot password?</button>'
     + '</form>'
     + '<div id="vit-auth-msg"></div>'
     + '</div>';
@@ -945,35 +976,98 @@ function buildAuthGate() {
   authGateEl = gate;
   const form = gate.querySelector('#vit-auth-form');
   const emailInput = gate.querySelector('#vit-auth-email');
-  const btn = gate.querySelector('#vit-auth-btn');
+  const passwordInput = gate.querySelector('#vit-auth-password');
+  const signinBtn = gate.querySelector('#vit-auth-signin');
+  const signupBtn = gate.querySelector('#vit-auth-signup');
+  const resetBtn = gate.querySelector('#vit-auth-reset');
   const msg = gate.querySelector('#vit-auth-msg');
+
+  function clearMsg() { msg.className = ''; msg.textContent = ''; }
+  function setError(text) { msg.className = 'err'; msg.textContent = text; }
+  function setOk(text) { msg.className = 'ok'; msg.textContent = text; }
+  function setBusy(b, action) {
+    signinBtn.disabled = b;
+    signupBtn.disabled = b;
+    resetBtn.disabled = b;
+    if (b && action === 'signin') signinBtn.textContent = 'Signing in...';
+    else if (b && action === 'signup') signupBtn.textContent = 'Creating...';
+    else { signinBtn.textContent = 'Sign in'; signupBtn.textContent = 'Create account'; }
+  }
+
   form.addEventListener('submit', async function (e) {
     e.preventDefault();
     const email = emailInput.value.trim();
-    if (!email || !sb) return;
-    btn.disabled = true;
-    btn.textContent = 'Sending...';
-    msg.className = '';
-    msg.textContent = '';
+    const password = passwordInput.value;
+    if (!email || !password || !sb) return;
+    clearMsg();
+    setBusy(true, 'signin');
     try {
-      const res = await sb.auth.signInWithOtp({
-        email: email,
-        options: {
-          emailRedirectTo: window.location.origin + window.location.pathname,
-          shouldCreateUser: true
-        }
-      });
+      const res = await sb.auth.signInWithPassword({ email: email, password: password });
       if (res.error) throw res.error;
-      msg.className = 'ok';
-      msg.textContent = 'Check your inbox — we sent a sign-in link to ' + email + '. Click it to come back here signed in.';
-      form.style.display = 'none';
+      /* onAuthStateChange will take it from here. */
     } catch (err) {
-      msg.className = 'err';
-      msg.textContent = (err && err.message) ? err.message : 'Could not send the link. Please try again.';
-      btn.disabled = false;
-      btn.textContent = 'Email me a sign-in link';
+      const m = (err && err.message) ? err.message : 'Could not sign in. Please try again.';
+      if (/invalid login credentials/i.test(m)) {
+        setError('Wrong email or password. If this is your first time, click Create account.');
+      } else if (/email not confirmed/i.test(m)) {
+        setError('Please check your inbox and confirm your email address, then come back and sign in.');
+      } else {
+        setError(m);
+      }
+      setBusy(false);
     }
   });
+
+  signupBtn.addEventListener('click', async function () {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
+    if (!email) { setError('Enter your email above first.'); return; }
+    if (!password || password.length < 6) { setError('Pick a password of at least 6 characters.'); return; }
+    if (!sb) return;
+    clearMsg();
+    setBusy(true, 'signup');
+    try {
+      const res = await sb.auth.signUp({
+        email: email,
+        password: password,
+        options: { emailRedirectTo: window.location.origin + window.location.pathname }
+      });
+      if (res.error) throw res.error;
+      if (res.data && res.data.session) {
+        /* Email confirmation is off — onAuthStateChange will sign in now. */
+        setOk('Account created. Loading your workspace...');
+      } else {
+        setOk('Account created. Check your inbox to confirm ' + email + ', then come back and sign in.');
+        setBusy(false);
+      }
+    } catch (err) {
+      const m = (err && err.message) ? err.message : 'Could not create the account. Please try again.';
+      if (/already registered|already exists|user already/i.test(m)) {
+        setError('That email already has an account. Use Sign in (or Forgot password if you don’t remember it).');
+      } else {
+        setError(m);
+      }
+      setBusy(false);
+    }
+  });
+
+  resetBtn.addEventListener('click', async function () {
+    const email = emailInput.value.trim();
+    if (!email) { setError('Enter your email above first, then click Forgot password.'); return; }
+    if (!sb) return;
+    clearMsg();
+    msg.className = ''; msg.textContent = 'Sending reset email...';
+    try {
+      const res = await sb.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin + window.location.pathname
+      });
+      if (res.error) throw res.error;
+      setOk('Check your inbox — we sent a password reset link to ' + email + '. Click it to come back and choose a new password.');
+    } catch (err) {
+      setError((err && err.message) ? err.message : 'Could not send the reset email.');
+    }
+  });
+
   return gate;
 }
 function showAuthGate(mode) {
@@ -1151,9 +1245,32 @@ function bootInterviewer() {
     if (r && r.data && r.data.session) onSignedIn(r.data.session);
   });
   sb.auth.onAuthStateChange(function (event, session) {
+    if (event === 'PASSWORD_RECOVERY') { handlePasswordRecovery(); return; }
     if (session) onSignedIn(session);
     else if (interviewerStarted) location.reload();
   });
+}
+
+/* ---- prompt for a new password after the user clicks a reset link ---- */
+async function handlePasswordRecovery() {
+  const newPw = window.prompt('Enter a new password (at least 6 characters):');
+  if (newPw == null) {
+    try { if (sb) await sb.auth.signOut(); } catch (e) {}
+    location.reload();
+    return;
+  }
+  if (newPw.length < 6) {
+    window.alert('Password must be at least 6 characters. Please try again.');
+    return handlePasswordRecovery();
+  }
+  try {
+    const res = await sb.auth.updateUser({ password: newPw });
+    if (res.error) throw res.error;
+    window.alert('Password updated. Loading your workspace...');
+    location.reload();
+  } catch (err) {
+    window.alert('Could not update password: ' + ((err && err.message) ? err.message : 'unknown error'));
+  }
 }
 
 const STATEMENT_TYPES = [
@@ -1164,6 +1281,17 @@ const STATEMENT_TYPES = [
   { key: 'price',     label: 'Price'      },
   { key: 'custom',    label: 'Custom'     },
 ];
+
+/* Coaching cues shown above each statement during the interview so the
+   interviewer knows exactly what to do at every step. */
+const STATEMENT_HINTS = {
+  headline: "Read the problem aloud. Don't reveal the solution yet — just describe the pain and watch how they react to seeing it named.",
+  quote:    "Read this real quote from someone with a similar problem. Watch for recognition (nodding, 'yes, exactly') or pushback.",
+  promise:  "Present the promise — the outcome they'd get if this worked. Read it like a clear value statement, not a feature list.",
+  feature:  "Name one specific feature that delivers the promise. Pause after reading and let them react before moving on.",
+  price:    "Now say what it would cost. This is where serious buyers separate from polite nodders — read their face carefully.",
+  custom:   "Read this aloud and ask for their honest reaction."
+};
 
 function uid() { return 'id-' + Math.random().toString(36).slice(2, 10); }
 
@@ -1498,9 +1626,11 @@ function renderStatementRow(c, slide, st, labelText) {
   const k = rkey(c.activeParticipantId, slide.id, st.id);
   const r = c.reactions[k] || {};
   const cls = 'is-' + st.type;
+  const hint = STATEMENT_HINTS[st.type] || '';
   return `<div class="statement-row ${r.reaction ? 'has-reaction' : ''}">
     <div class="stmt">
       <div class="stmt-meta"><span class="stmt-label">${escapeHtml(labelText)}</span></div>
+      ${hint ? `<div class="stmt-hint">${escapeHtml(hint)}</div>` : ''}
       <div class="stmt-text ${cls}">${escapeHtml(st.text)}</div>
       <input class="phrase-input" data-st-key="${st.id}" placeholder="Your private notes / key phrase…" value="${escapeHtml(r.phrases || '')}" />
     </div>
