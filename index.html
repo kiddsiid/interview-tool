@@ -610,7 +610,7 @@
     body { background: white !important; }
     .container { max-width: 100% !important; padding: 0 !important; }
     .topbar, .tabs, .modal-back, .toast,
-    #view-interview, #view-share, #view-edit, #view-participants, #view-export,
+    #view-interview, #view-share, #view-edit, #view-participants, #view-settings,
     #participant-ui, .heatmap-controls { display: none !important; }
     #view-heatmap { display: block !important; }
     #view-heatmap .panel { box-shadow: none !important; padding: 0 !important; margin: 0 !important; background: white !important; }
@@ -658,7 +658,7 @@
     <button class="tab" data-view="share">🔗 Share with participant</button>
     <button class="tab" data-view="edit">✏️ Edit slides</button>
     <button class="tab" data-view="participants">👥 Participants</button>
-    <button class="tab" data-view="export">📤 Export / Backup</button>
+    <button class="tab" data-view="settings">⚙️ Settings</button>
   </div>
 
   <!-- ============ INTERVIEW TAB ============ -->
@@ -826,10 +826,30 @@
   </div>
 
   <!-- ============ EXPORT TAB ============ -->
-  <div id="view-export" style="display:none">
+  <div id="view-settings" style="display:none">
+
     <div class="panel">
-      <h3 style="margin-top:0">Export &amp; Backup</h3>
-      <p style="color:var(--muted);font-size:13px">Everything you've entered lives in your browser. Export it before clearing browser data, or to share with a collaborator.</p>
+      <h3 style="margin-top:0">📂 Import slides</h3>
+      <p style="color:var(--muted);font-size:13px;margin-top:0">
+        Drop in a PDF or PowerPoint file that follows the
+        <em>minimal viable slide</em> template
+        (headline, pain quote, "Now you can…" promise, bulleted features, price).
+        Reactioner will pull each slide's pieces into the right slots.
+      </p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <button class="btn primary" id="import-slides-btn">Choose a PDF or PPTX file…</button>
+        <input type="file" id="import-slides-input" accept=".pdf,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.presentationml.presentation" style="display:none" />
+        <span id="import-slides-status" style="font-size:13px;color:var(--muted)"></span>
+      </div>
+      <div id="import-slides-preview" style="margin-top:14px"></div>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">📤 Export &amp; Backup</h3>
+      <p style="color:var(--muted);font-size:13px;margin-top:0">
+        Your data is saved to your account automatically. These exports are
+        for sharing results with someone else, or for keeping an offline copy.
+      </p>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
         <button class="btn primary" id="export-json">Download full backup (.json)</button>
         <button class="btn" id="export-csv-current">Download current cycle (.csv)</button>
@@ -837,14 +857,29 @@
         <button class="btn" id="import-json">Import backup (.json)…</button>
         <input type="file" id="import-file-input" accept=".json,application/json" style="display:none" />
       </div>
-      <h4 style="margin-bottom:6px">Reset</h4>
+      <details>
+        <summary style="cursor:pointer;color:var(--muted);font-size:13px">Live preview of summary</summary>
+        <pre id="export-preview" style="background:var(--soft);padding:12px;border-radius:8px;font-size:12px;max-height:280px;overflow:auto;white-space:pre-wrap;margin-top:8px"></pre>
+      </details>
+    </div>
+
+    <div class="panel">
+      <h3 style="margin-top:0">🎚️ Score mapping</h3>
+      <p style="color:var(--muted);font-size:13px;margin-top:0">
+        How each reaction scores in the heatmap. Lives in the <strong>🔥 Heatmap</strong> tab —
+        the same controls show up there for quick tweaking while you analyze.
+      </p>
+    </div>
+
+    <div class="panel" style="border-color:#f3c2c2">
+      <h3 style="margin-top:0;color:#b71c1c">⚠ Reset</h3>
+      <p style="color:var(--muted);font-size:13px;margin-top:0">Destructive — there's no undo.</p>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn danger" id="reset-cycle-reactions">Clear reactions in this cycle</button>
         <button class="btn danger" id="reset-everything">Wipe everything &amp; restore defaults</button>
       </div>
-      <h4 style="margin-top:18px;margin-bottom:6px">Live preview of summary</h4>
-      <pre id="export-preview" style="background:var(--soft);padding:12px;border-radius:8px;font-size:12px;max-height:280px;overflow:auto;white-space:pre-wrap"></pre>
     </div>
+
   </div>
 
 </div>
@@ -1295,51 +1330,17 @@ const STATEMENT_HINTS = {
 
 function uid() { return 'id-' + Math.random().toString(36).slice(2, 10); }
 
+/* New accounts start with no demo slides — users add their own or
+   import them from a PDF/PPTX template. */
 function defaultSlides() {
-  return [
-    {
-      id: uid(),
-      color: '#e53935',
-      headline: 'Stop Being the Bottleneck in Your Own Food Truck Business',
-      statements: [
-        { id: uid(), type: 'quote',   text: '"I built this business for freedom, but now everything depends on me. If I stop moving, the business stops moving."' },
-        { id: uid(), type: 'promise', text: 'Now you can reduce operational chaos with standardized prep, staffing, and event workflows.' },
-        { id: uid(), type: 'feature', text: 'Centralized prep and operational checklists' },
-        { id: uid(), type: 'feature', text: 'Repeatable event execution systems' },
-        { id: uid(), type: 'feature', text: 'Staff delegation and accountability workflows' },
-        { id: uid(), type: 'feature', text: 'Scheduling and coordination systems that reduce owner dependency' },
-        { id: uid(), type: 'price',   text: '$3,000 onboarding + operational systems implementation' },
-      ]
-    },
-    {
-      id: uid(),
-      color: '#f57c00',
-      headline: 'Stop Guessing Which Events Will Actually Make You Money',
-      statements: [
-        { id: uid(), type: 'quote',   text: '"I spend thousands prepping for events and still don\'t know if I\'ll profit until the day is over."' },
-        { id: uid(), type: 'promise', text: 'Now you can evaluate event profitability with forecasting tools and operational planning systems.' },
-        { id: uid(), type: 'feature', text: 'Event profitability calculator' },
-        { id: uid(), type: 'feature', text: 'Prep forecasting and staffing planning' },
-        { id: uid(), type: 'feature', text: 'Event scoring system based on attendance, fees, and competition' },
-        { id: uid(), type: 'feature', text: 'Operational playbooks for high-volume event execution' },
-        { id: uid(), type: 'price',   text: '$750/month event optimization and planning membership' },
-      ]
-    },
-    {
-      id: uid(),
-      color: '#2f80ed',
-      headline: 'Build a Food Truck Business That Runs Without You',
-      statements: [
-        { id: uid(), type: 'quote',   text: '"We grew fast, but now consistency, staffing, and operations are harder than the cooking itself."' },
-        { id: uid(), type: 'promise', text: 'Now you can scale multiple food truck operations with repeatable systems and management infrastructure.' },
-        { id: uid(), type: 'feature', text: 'Multi-unit operations systems' },
-        { id: uid(), type: 'feature', text: 'Staff training and consistency workflows' },
-        { id: uid(), type: 'feature', text: 'Inventory and commissary coordination systems' },
-        { id: uid(), type: 'feature', text: 'Internal operations dashboards and SOP libraries' },
-        { id: uid(), type: 'price',   text: '$12,000 multi-unit operational scaling engagement' },
-      ]
-    }
-  ];
+  return [];
+}
+
+/* Default palette used when importing or creating slides — cycles through
+   these colors so each slide is visually distinct. */
+const SLIDE_COLORS = ['#e53935','#f57c00','#2f80ed','#43a047','#8e24aa','#00897b','#c2185b','#5e35b1'];
+function nextSlideColor(existingCount) {
+  return SLIDE_COLORS[existingCount % SLIDE_COLORS.length];
 }
 
 function defaultParticipants() {
@@ -1366,8 +1367,8 @@ function defaultCycle(name) {
 
 function defaultState() {
   const c1 = defaultCycle('Cycle 1');
-  c1.activeSlideId = c1.slides[0].id;
-  c1.activeParticipantId = c1.participants[0].id;
+  c1.activeSlideId = c1.slides[0] ? c1.slides[0].id : null;
+  c1.activeParticipantId = c1.participants[0] ? c1.participants[0].id : null;
   return {
     cycles: [c1],
     activeCycleId: c1.id,
@@ -1490,7 +1491,7 @@ function colorForScore(score) {
 function reactionToScore(rxn) { return rxn ? (state.scoreMap[rxn] || 0) : 0; }
 function reactionEmoji(rxn) { return rxn === 'love' ? '❤️' : rxn === 'like' ? '👍' : rxn === 'dislike' ? '👎' : ''; }
 
-const views = ['interview', 'heatmap', 'share', 'edit', 'participants', 'export'];
+const views = ['interview', 'heatmap', 'share', 'edit', 'participants', 'settings'];
 function setView(v) {
   state.activeView = v; save();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
@@ -1503,7 +1504,7 @@ function setView(v) {
   if (v === 'share') renderShare();
   if (v === 'edit') renderEditSlides();
   if (v === 'participants') renderParticipants();
-  if (v === 'export') renderExportPreview();
+  if (v === 'settings') renderExportPreview();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setView(t.dataset.view)));
 
@@ -1515,7 +1516,8 @@ document.getElementById('add-cycle').addEventListener('click', () => {
   const name = prompt('New cycle name?', `Cycle ${state.cycles.length + 1}`);
   if (!name) return;
   const c = defaultCycle(name);
-  c.activeSlideId = c.slides[0].id; c.activeParticipantId = c.participants[0].id;
+  c.activeSlideId = c.slides[0] ? c.slides[0].id : null;
+  c.activeParticipantId = c.participants[0] ? c.participants[0].id : null;
   state.cycles.push(c); state.activeCycleId = c.id;
   save(); renderCycleSelect(); setView(state.activeView);
 });
@@ -1586,7 +1588,20 @@ function renderInterview() {
   renderInterviewNav();
 
   const slide = c.slides.find(s => s.id === c.activeSlideId);
-  if (!slide) { slideContainer.innerHTML = '<div class="panel">No slides — go to Edit slides to add some.</div>'; return; }
+  if (!slide) {
+    slideContainer.innerHTML = '<div class="panel empty-cycle-panel">'
+      + '<h3 style="margin-top:0">This cycle has no slides yet</h3>'
+      + '<p style="color:var(--muted);margin:0 0 14px 0">Add slides one at a time, or import a whole batch from a PDF or PowerPoint template.</p>'
+      + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+      +   '<button class="btn primary" id="empty-cycle-add">+ Add a slide manually</button>'
+      +   '<button class="btn" id="empty-cycle-import">📂 Import from PDF / PPTX</button>'
+      + '</div></div>';
+    const addBtn = document.getElementById('empty-cycle-add');
+    if (addBtn) addBtn.addEventListener('click', () => setView('edit'));
+    const impBtn = document.getElementById('empty-cycle-import');
+    if (impBtn) impBtn.addEventListener('click', () => setView('settings'));
+    return;
+  }
 
   let html = `<div class="slide-card" style="--slide-accent:${slide.color}">`;
   html += `<h2 class="headline">${escapeHtml(slide.headline)}</h2>`;
@@ -2433,6 +2448,280 @@ document.getElementById('reset-everything').addEventListener('click', () => {
   state = defaultState();
   save(); renderCycleSelect(); setView('interview'); showToast('Reset to defaults');
 });
+
+/* ============================================================
+   PDF / PPTX IMPORT (Settings tab)
+   ============================================================ */
+let _pdfjsLoaded = null, _jszipLoaded = null;
+function loadScriptOnce(url) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = url;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load ' + url));
+    document.head.appendChild(s);
+  });
+}
+async function ensurePdfJs() {
+  if (window.pdfjsLib) return;
+  if (!_pdfjsLoaded) _pdfjsLoaded = loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js');
+  await _pdfjsLoaded;
+  if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+}
+async function ensureJSZip() {
+  if (window.JSZip) return;
+  if (!_jszipLoaded) _jszipLoaded = loadScriptOnce('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
+  await _jszipLoaded;
+}
+
+async function extractPdfPages(file) {
+  await ensurePdfJs();
+  if (!window.pdfjsLib) throw new Error('PDF library failed to load.');
+  const data = new Uint8Array(await file.arrayBuffer());
+  const pdf = await window.pdfjsLib.getDocument({ data: data }).promise;
+  const out = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    out.push(reconstructPdfText(tc.items));
+  }
+  return out;
+}
+function reconstructPdfText(items) {
+  if (!items || !items.length) return '';
+  const lines = [];
+  let curY = null, cur = '';
+  for (const it of items) {
+    const y = Math.round(it.transform[5]);
+    if (curY === null) { cur = it.str; curY = y; continue; }
+    if (Math.abs(curY - y) > 2) {
+      if (cur.trim()) lines.push(cur);
+      cur = it.str;
+      curY = y;
+    } else {
+      cur += it.str;
+    }
+  }
+  if (cur.trim()) lines.push(cur);
+  return lines.join('\n');
+}
+
+async function extractPptxSlides(file) {
+  await ensureJSZip();
+  if (!window.JSZip) throw new Error('PPTX library failed to load.');
+  const data = await file.arrayBuffer();
+  const zip = await window.JSZip.loadAsync(data);
+  const slideNames = Object.keys(zip.files)
+    .filter(n => /^ppt\/slides\/slide\d+\.xml$/.test(n))
+    .sort((a, b) => parseInt(a.match(/slide(\d+)/)[1], 10) - parseInt(b.match(/slide(\d+)/)[1], 10));
+  const out = [];
+  for (const name of slideNames) {
+    const xml = await zip.files[name].async('string');
+    out.push(extractPptxSlideText(xml));
+  }
+  return out;
+}
+function extractPptxSlideText(xml) {
+  const paragraphs = [];
+  const pMatches = xml.match(/<a:p\b[^>]*>[\s\S]*?<\/a:p>/g) || [];
+  for (const p of pMatches) {
+    /* Inside a paragraph, <a:br/> represents a line break; split on it
+       so a headline + quote in one text frame become separate lines. */
+    const segments = p.split(/<a:br\b[^>]*\/?>(?:<\/a:br>)?/);
+    for (const seg of segments) {
+      const ts = seg.match(/<a:t[^>]*>([\s\S]*?)<\/a:t>/g) || [];
+      const text = ts.map(t => t.replace(/<a:t[^>]*>([\s\S]*?)<\/a:t>/, '$1')).join('');
+      const u = text
+        .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+      if (u.trim()) paragraphs.push(u.trim());
+    }
+  }
+  return paragraphs.join('\n');
+}
+
+/* Parse one slide's raw text into {headline, statements[]}. Recognizes the
+   minimal viable template: headline, "quoted pain", "Now you can..." promise,
+   "Solution Features / Benefits:" bullets, "Price:" line. */
+function parseSlideText(raw) {
+  if (!raw || !raw.trim()) return null;
+  let lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+  const stopIdx = lines.findIndex(l => /^use these/i.test(l));
+  if (stopIdx >= 0) lines = lines.slice(0, stopIdx);
+  lines = lines.filter(l =>
+    !/^\s*[❤👍👎]\s*=/.test(l) &&
+    !/^=\s*(super\s+)?(positive|negative)\s*$/i.test(l) &&
+    !/^[❤👍👎]\s*$/.test(l)
+  );
+  if (!lines.length) return null;
+
+  let headline = '', quote = '', promise = '', price = '';
+  const features = [];
+  let section = null;
+  const isQuoteOpen = (l) => /^["“„]/.test(l);
+  const closesQuote = (l) => /["”„][\s,.;:!?]*$/.test(l);
+
+  for (let idx = 0; idx < lines.length; idx++) {
+    const l = lines[idx];
+    if (!l) continue;
+    if (/^solution\s+features/i.test(l)) { section = 'features'; continue; }
+    if (/^price\b/i.test(l)) {
+      section = 'price';
+      const m = l.match(/^price\s*[:\-–]\s*(.+)$/i);
+      if (m && m[1].trim()) { price = m[1].trim(); section = null; }
+      continue;
+    }
+    if (!quote && isQuoteOpen(l)) {
+      let q = l, j = idx + 1;
+      while (j < lines.length && !closesQuote(q) && (j - idx) < 8) {
+        q += ' ' + lines[j];
+        j++;
+      }
+      quote = q;
+      idx = j - 1;
+      continue;
+    }
+    if (!promise && /^now you can/i.test(l)) { promise = l; continue; }
+    if (section === 'features') {
+      const clean = l.replace(/^[•●○◦▪▫·*\-–\s]+/, '').trim();
+      if (clean) features.push(clean);
+      continue;
+    }
+    if (section === 'price') {
+      price = price ? (price + ' ' + l) : l;
+      continue;
+    }
+    if (!headline) { headline = l; continue; }
+  }
+  if (!headline && !quote && !features.length && !promise && !price) return null;
+  const stmts = [];
+  if (quote) stmts.push({ type: 'quote', text: quote });
+  if (promise) stmts.push({ type: 'promise', text: promise });
+  for (const f of features) stmts.push({ type: 'feature', text: f });
+  if (price) stmts.push({ type: 'price', text: price });
+  return { headline: headline || 'Untitled slide', statements: stmts };
+}
+
+async function handleImportFile(file) {
+  const statusEl = document.getElementById('import-slides-status');
+  const previewEl = document.getElementById('import-slides-preview');
+  if (statusEl) statusEl.textContent = 'Reading ' + file.name + '...';
+  if (previewEl) previewEl.innerHTML = '';
+  try {
+    const name = file.name.toLowerCase();
+    let texts;
+    if (name.endsWith('.pdf')) {
+      texts = await extractPdfPages(file);
+    } else if (name.endsWith('.pptx')) {
+      texts = await extractPptxSlides(file);
+    } else {
+      throw new Error('Only .pdf and .pptx files are supported.');
+    }
+    const parsed = texts.map(parseSlideText).filter(Boolean);
+    if (!parsed.length) {
+      statusEl.textContent = '';
+      previewEl.innerHTML = '<p style="color:#b71c1c;font-size:13px">Could not find any slides matching the minimal-viable template. Each slide should have a headline, a quoted pain quote, a "Now you can..." promise, "Solution Features / Benefits:" with bullets, and a "Price:" line.</p>';
+      return;
+    }
+    statusEl.textContent = 'Found ' + parsed.length + ' slide' + (parsed.length === 1 ? '' : 's') + ' in ' + file.name;
+    renderImportPreview(parsed);
+  } catch (err) {
+    statusEl.textContent = '';
+    previewEl.innerHTML = '<p style="color:#b71c1c;font-size:13px">Import failed: ' + escapeHtml((err && err.message) || String(err)) + '</p>';
+  }
+}
+
+function renderImportPreview(parsedSlides) {
+  const previewEl = document.getElementById('import-slides-preview');
+  if (!previewEl) return;
+  const start = activeCycle().slides.length;
+  let html = '<h4 style="margin:14px 0 8px 0">Preview</h4>';
+  parsedSlides.forEach((s, idx) => {
+    const color = nextSlideColor(start + idx);
+    html += '<div style="border:1px solid var(--border);border-left:4px solid ' + color + ';border-radius:8px;padding:10px 12px;margin-bottom:8px;background:var(--soft)">'
+      + '<div style="font-weight:700;font-size:13px;color:' + color + ';margin-bottom:6px">'
+      + escapeHtml(s.headline) + '</div>';
+    for (const st of s.statements) {
+      const lbl = (STATEMENT_TYPES.find(t => t.key === st.type) || {}).label || st.type;
+      html += '<div style="font-size:12px;margin:3px 0;line-height:1.4"><strong style="color:var(--muted)">' + escapeHtml(lbl) + ':</strong> ' + escapeHtml(st.text) + '</div>';
+    }
+    html += '</div>';
+  });
+  html += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">'
+    + '<button class="btn primary" id="import-commit-append">Append to current cycle</button>'
+    + '<button class="btn" id="import-commit-replace">Replace current cycle\'s slides</button>'
+    + '<button class="btn" id="import-commit-newcycle">Create new cycle with these</button>'
+    + '<button class="btn" id="import-cancel">Cancel</button>'
+    + '</div>';
+  previewEl.innerHTML = html;
+
+  function buildSlides(colorOffset) {
+    return parsedSlides.map((s, i) => ({
+      id: uid(),
+      color: nextSlideColor(colorOffset + i),
+      headline: s.headline,
+      statements: s.statements.map(st => ({ id: uid(), type: st.type, text: st.text }))
+    }));
+  }
+  function clearPreview() {
+    previewEl.innerHTML = '';
+    const statusEl = document.getElementById('import-slides-status');
+    if (statusEl) statusEl.textContent = '';
+  }
+
+  document.getElementById('import-commit-append').addEventListener('click', () => {
+    const c = activeCycle();
+    const newSlides = buildSlides(c.slides.length);
+    c.slides.push(...newSlides);
+    if (!c.activeSlideId && c.slides.length) c.activeSlideId = c.slides[0].id;
+    save();
+    showToast('Imported ' + newSlides.length + ' slide' + (newSlides.length === 1 ? '' : 's'));
+    clearPreview();
+    setView('interview');
+  });
+  document.getElementById('import-commit-replace').addEventListener('click', () => {
+    if (!confirm('Replace all slides in this cycle? Existing reactions will be cleared.')) return;
+    const c = activeCycle();
+    c.slides = buildSlides(0);
+    c.activeSlideId = c.slides[0] ? c.slides[0].id : null;
+    c.reactions = {};
+    save();
+    showToast('Replaced with ' + c.slides.length + ' slide' + (c.slides.length === 1 ? '' : 's'));
+    clearPreview();
+    setView('interview');
+  });
+  document.getElementById('import-commit-newcycle').addEventListener('click', () => {
+    const name = prompt('Name for the new cycle?', 'Imported cycle');
+    if (!name) return;
+    const c = defaultCycle(name);
+    c.slides = buildSlides(0);
+    c.activeSlideId = c.slides[0] ? c.slides[0].id : null;
+    c.activeParticipantId = c.participants[0] ? c.participants[0].id : null;
+    state.cycles.push(c);
+    state.activeCycleId = c.id;
+    save();
+    renderCycleSelect();
+    showToast('Created cycle "' + name + '" with ' + c.slides.length + ' slide' + (c.slides.length === 1 ? '' : 's'));
+    clearPreview();
+    setView('interview');
+  });
+  document.getElementById('import-cancel').addEventListener('click', clearPreview);
+}
+
+(function wireImportButtons() {
+  const btn = document.getElementById('import-slides-btn');
+  const input = document.getElementById('import-slides-input');
+  if (!btn || !input) return;
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (file) handleImportFile(file);
+    e.target.value = '';
+  });
+})();
+
 function renderExportPreview() {
   document.getElementById('export-preview').textContent = buildSummaryText(activeCycle());
 }
