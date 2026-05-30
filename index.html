@@ -4,6 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Reactioner — Capture customer reactions to your value props</title>
+<meta name="description" content="Reactioner — read your value props aloud in customer interviews, capture ❤️ 👍 👎 reactions, and watch a heatmap reveal what actually resonates." />
+<meta name="theme-color" content="#4f46e5" />
+<!-- Favicon: a rounded brand card with the signature ❤️ reaction, inlined so the file stays self-contained -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%236366f1'/%3E%3Cstop offset='1' stop-color='%234f46e5'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='4' y='4' width='56' height='56' rx='16' fill='url(%23g)'/%3E%3Cpath d='M32 47.5c-1 0-2-.4-2.8-1.1l-9.4-8.6C16.1 34.4 15 31.7 15 28.6c0-4.9 3.8-8.6 8.6-8.6 2.7 0 5.2 1.2 6.9 3.2l1.5 1.7 1.5-1.7c1.7-2 4.2-3.2 6.9-3.2 4.8 0 8.6 3.7 8.6 8.6 0 3.1-1.1 5.8-4.8 9.2l-9.4 8.6c-.8.7-1.8 1.1-2.8 1.1z' fill='%23ffffff'/%3E%3C/svg%3E" />
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%234f46e5'/%3E%3Cpath d='M32 47.5c-1 0-2-.4-2.8-1.1l-9.4-8.6C16.1 34.4 15 31.7 15 28.6c0-4.9 3.8-8.6 8.6-8.6 2.7 0 5.2 1.2 6.9 3.2l1.5 1.7 1.5-1.7c1.7-2 4.2-3.2 6.9-3.2 4.8 0 8.6 3.7 8.6 8.6 0 3.1-1.1 5.8-4.8 9.2l-9.4 8.6c-.8.7-1.8 1.1-2.8 1.1z' fill='%23ffffff'/%3E%3C/svg%3E" />
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root {
@@ -632,6 +637,262 @@
   }
   .print-header, .print-notes { display: none; }
 </style>
+
+<!-- ============================================================
+     UI OVERHAUL (v2) — design-system override layer.
+     Loaded after the base styles so these rules win by cascade.
+     Redefines the palette (cascades everywhere via CSS vars) and
+     restyles components for a friendlier, guided experience.
+     All original selectors/IDs are preserved.
+     ============================================================ -->
+<style>
+  :root {
+    --bg: #f3f4fb;
+    --panel: #ffffff;
+    --text: #1d2233;
+    --muted: #6b7280;
+    --border: #e7e9f2;
+    --soft: #f5f6fb;
+    --accent: #4f46e5;
+    --accent-soft: #eef0fe;
+    --brand-grad: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    --shadow: 0 1px 2px rgba(20,22,40,0.04), 0 10px 28px rgba(20,22,40,0.07);
+    --shadow-sm: 0 1px 2px rgba(20,22,40,0.05);
+    --radius: 16px;
+    --radius-sm: 10px;
+
+    --love-bg: #ffe2ea; --love-c: #e11d48;
+    --like-bg: #dcfce7; --like-c: #15803d;
+    --dis-bg:  #fee2e2; --dis-c:  #dc2626;
+
+    --hm--3: #b71c1c; --hm--2: #e0524a; --hm--1: #f4b4ad;
+    --hm-0:  #eef0f5;
+    --hm-1:  #bfe9c8; --hm-2:  #57bd6f; --hm-3:  #1b7a36;
+  }
+
+  body {
+    font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    font-size: 14.5px;
+    color: var(--text);
+  }
+  .container { max-width: 1200px; padding: 22px 18px 80px; }
+
+  /* ---------- Top bar / brand ---------- */
+  .topbar {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  .topbar-title { flex-direction: row; align-items: center; gap: 14px; }
+  .topbar-title::before {
+    content: "";
+    width: 44px; height: 44px; flex: none;
+    border-radius: 13px;
+    background: var(--brand-grad);
+    box-shadow: 0 6px 16px rgba(79,70,229,0.34);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 50c-1.1 0-2.2-.4-3-1.2L18.4 39C14.2 35.1 13 32 13 28.5 13 23 17.3 18.8 22.7 18.8c3 0 5.8 1.4 7.7 3.6l1.6 1.9 1.6-1.9c1.9-2.2 4.7-3.6 7.7-3.6C46.7 18.8 51 23 51 28.5c0 3.5-1.2 6.6-5.4 10.5L35 48.8c-.8.8-1.9 1.2-3 1.2z' fill='%23000'/%3E%3C/svg%3E") center/30px no-repeat, var(--brand-grad);
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cpath d='M32 50c-1.1 0-2.2-.4-3-1.2L18.4 39C14.2 35.1 13 32 13 28.5 13 23 17.3 18.8 22.7 18.8c3 0 5.8 1.4 7.7 3.6l1.6 1.9 1.6-1.9c1.9-2.2 4.7-3.6 7.7-3.6C46.7 18.8 51 23 51 28.5c0 3.5-1.2 6.6-5.4 10.5L35 48.8c-.8.8-1.9 1.2-3 1.2z' fill='%23000'/%3E%3C/svg%3E") center/30px no-repeat;
+    background-blend-mode: normal;
+  }
+  /* draw the mark as a white glyph on the gradient tile */
+  .topbar-title { position: relative; }
+  .topbar-title::before {
+    background: var(--brand-grad);
+    -webkit-mask: none; mask: none;
+  }
+  .brand-mark {
+    width: 44px; height: 44px; flex: none; border-radius: 13px;
+    background: var(--brand-grad);
+    box-shadow: 0 6px 16px rgba(79,70,229,0.34);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 22px;
+  }
+  .brand-name { font-size: 20px; letter-spacing: 0.3px; font-weight: 800; }
+  .brand-tagline { font-size: 12.5px; margin-top: 2px; }
+  .topbar-right { gap: 6px; }
+
+  /* hide the ::before pseudo mark in favour of a real .brand-mark element */
+  .topbar-title::before { display: none; }
+
+  /* ---------- Tabs ---------- */
+  .tabs {
+    gap: 4px;
+    padding: 7px;
+    border: 1px solid var(--border);
+    border-radius: 14px;
+  }
+  .tab { font-size: 13.5px; padding: 10px 15px; border-radius: 10px; transition: all 0.14s ease; }
+  .tab.active { background: var(--brand-grad); box-shadow: 0 4px 12px rgba(79,70,229,0.28); }
+  .tab:hover:not(.active) { background: var(--accent-soft); color: var(--accent); }
+
+  /* ---------- Panels & cards ---------- */
+  .panel { border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+  .panel h3, .panel h4 { letter-spacing: -0.01em; }
+
+  /* ---------- Buttons ---------- */
+  .btn {
+    border-radius: var(--radius-sm);
+    padding: 9px 15px;
+    font-weight: 600;
+    transition: all 0.14s ease;
+    box-shadow: var(--shadow-sm);
+  }
+  .btn:hover { background: var(--accent-soft); border-color: #cdd0ee; color: var(--accent); }
+  .btn.primary { background: var(--brand-grad); border-color: transparent; box-shadow: 0 4px 12px rgba(79,70,229,0.28); }
+  .btn.primary:hover { filter: brightness(1.07); background: var(--brand-grad); color: #fff; }
+  .btn.tiny { padding: 6px 11px; border-radius: 8px; }
+  .btn.danger { color: var(--dis-c); border-color: #f4c9c9; background: #fff; }
+  .btn.danger:hover { background: var(--dis-bg); color: var(--dis-c); }
+
+  /* ---------- Inputs ---------- */
+  select, input[type="text"], textarea, input[type="email"], input[type="password"], input[type="number"] {
+    border-radius: var(--radius-sm);
+    padding: 9px 12px;
+  }
+  select:focus, input:focus, textarea:focus { outline: 3px solid var(--accent-soft); border-color: var(--accent); }
+  label.field-label { color: var(--muted); letter-spacing: 0.5px; }
+
+  /* ---------- Guidance: how-to + steps + callouts ---------- */
+  .interview-howto {
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+    background: var(--panel);
+    box-shadow: var(--shadow-sm);
+    padding: 0;
+    overflow: hidden;
+  }
+  .interview-howto summary {
+    list-style: none;
+    padding: 14px 18px;
+    font-size: 14px;
+    display: flex; align-items: center; gap: 9px;
+  }
+  .interview-howto summary::-webkit-details-marker { display: none; }
+  .interview-howto summary::before { content: "💡"; font-size: 16px; }
+  .interview-howto summary::after {
+    content: "▾"; margin-left: auto; color: var(--muted); transition: transform 0.2s ease;
+  }
+  .interview-howto[open] summary::after { transform: rotate(180deg); }
+  .interview-howto[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 0; background: var(--soft); }
+  .interview-howto ol { padding: 14px 18px 16px 38px; margin: 0; counter-reset: step; }
+  .interview-howto li { margin-bottom: 9px; line-height: 1.5; }
+
+  /* Numbered "stepper" used across guidance areas */
+  .steps { display: grid; gap: 10px; margin: 4px 0 0; }
+  .step { display: flex; gap: 12px; align-items: flex-start; }
+  .step .num {
+    flex: none; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--brand-grad); color: #fff;
+    font-size: 13px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 3px 8px rgba(79,70,229,0.3);
+  }
+  .step .step-body { flex: 1; line-height: 1.5; font-size: 13.5px; }
+  .step .step-body strong { color: var(--text); }
+
+  .help-callout {
+    display: flex; gap: 11px;
+    background: var(--accent-soft);
+    border: 1px solid #d9dcfb;
+    border-radius: 12px;
+    padding: 13px 15px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: #353a63;
+    margin-bottom: 16px;
+  }
+  .help-callout .ico { font-size: 18px; flex: none; line-height: 1.4; }
+  .help-callout strong { color: var(--accent); }
+  .help-callout.warn { background: #fff7ed; border-color: #fed7aa; color: #7c4a16; }
+  .help-callout.warn strong { color: #c2620f; }
+  .help-callout.good { background: #ecfdf3; border-color: #bbf7d0; color: #14532d; }
+  .help-callout.good strong { color: var(--like-c); }
+
+  .section-intro { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 0 0 16px; }
+
+  /* ---------- Interview slide / statements ---------- */
+  .slide-card { border-radius: var(--radius); border: 1px solid var(--border); border-top-width: 6px; padding: 24px; }
+  .slide-card h2.headline { font-size: 23px; }
+  .statement-row { border-radius: 12px; padding: 12px 14px; }
+  .statement-row.has-reaction { box-shadow: inset 3px 0 0 var(--slide-accent, #ccc); }
+  .stmt-hint { background: var(--soft); border-radius: 8px; padding: 7px 10px; margin: 4px 0 6px; font-size: 12px; }
+  .stmt-label { border-radius: 999px; background: var(--accent-soft); color: var(--accent); border-color: transparent; }
+  .rxn-btn { width: 42px; height: 42px; border-radius: 11px; font-size: 19px; }
+  .reaction-buttons { gap: 6px; }
+
+  /* ---------- Slide nav pills ---------- */
+  .slide-nav { border: 1px solid var(--border); border-radius: 14px; padding: 6px; gap: 5px; }
+  .slide-pill { border-radius: 9px; padding: 8px 13px; }
+  .slide-pill.active { background: var(--accent-soft); color: var(--accent); }
+  .slide-pill .progress { border-radius: 999px; }
+
+  /* ---------- Heatmap ---------- */
+  .heatmap-table-wrap { border: 1px solid var(--border); border-radius: var(--radius); }
+  table.heatmap thead th { background: var(--soft); }
+  table.heatmap td.score-cell { border-radius: 0; }
+  #heatmap-summary { margin: 4px 0 16px; }
+  .hm-summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .hm-sum-card { border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; background: var(--panel); box-shadow: var(--shadow-sm); }
+  .hm-sum-card h4 { margin: 0 0 8px; font-size: 13px; display: flex; align-items: center; gap: 7px; }
+  .hm-sum-card.win h4 { color: var(--like-c); }
+  .hm-sum-card.flop h4 { color: var(--dis-c); }
+  .hm-sum-card ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: var(--text); }
+  .hm-sum-card .muted-empty { color: var(--muted); font-size: 13px; }
+  .hm-sum-meta { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  @media (max-width: 720px) { .hm-summary-grid { grid-template-columns: 1fr; } }
+
+  /* ---------- Edit slides ---------- */
+  .edit-slide { border-radius: 14px; border: 1px solid var(--border); border-left-width: 6px; }
+  .edit-slide-title { font-size: 15px; }
+
+  /* ---------- Modal ---------- */
+  .modal { border-radius: var(--radius); padding: 24px; box-shadow: 0 24px 60px rgba(20,22,40,0.3); }
+
+  /* ---------- Participant view ---------- */
+  body.participant-mode { background: var(--bg); }
+  .pp-welcome, .pp-slide, .pp-done-screen { border-radius: 20px; }
+  .pp-rxn button { border-radius: 14px; }
+  .pp-nav button.primary { background: var(--brand-grad); border-color: transparent; }
+  .pp-dot.done { background: var(--like-c); }
+  .pp-dot.active { background: var(--accent); }
+
+  /* ---------- First-run onboarding modal ---------- */
+  .onb-back {
+    position: fixed; inset: 0; z-index: 200;
+    background: rgba(23,25,40,0.55);
+    backdrop-filter: blur(3px);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .onb-back.show { display: flex; animation: onbFade 0.2s ease; }
+  @keyframes onbFade { from { opacity: 0 } to { opacity: 1 } }
+  .onb-card {
+    background: var(--panel); border-radius: 22px; max-width: 480px; width: 100%;
+    box-shadow: 0 30px 70px rgba(20,22,40,0.35); overflow: hidden;
+    animation: onbPop 0.22s cubic-bezier(.2,.9,.3,1.2);
+  }
+  @keyframes onbPop { from { transform: translateY(12px) scale(.98); opacity: 0 } to { transform: none; opacity: 1 } }
+  .onb-head { background: var(--brand-grad); color: #fff; padding: 26px 26px 22px; }
+  .onb-head .onb-mark { font-size: 30px; }
+  .onb-head h2 { margin: 10px 0 6px; font-size: 22px; font-weight: 800; }
+  .onb-head p { margin: 0; opacity: 0.92; font-size: 14px; line-height: 1.5; }
+  .onb-body { padding: 22px 26px; }
+  .onb-body .steps { gap: 14px; }
+  .onb-foot { padding: 4px 26px 24px; display: flex; gap: 10px; align-items: center; }
+  .onb-foot .btn.primary { flex: 1; padding: 12px; font-size: 15px; }
+  .onb-skip { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; font-family: inherit; }
+  .onb-skip:hover { color: var(--text); text-decoration: underline; }
+
+  @media (max-width: 720px) {
+    .container { padding: 14px 12px 80px; }
+    .topbar { padding: 14px; }
+    .hm-summary-grid { grid-template-columns: 1fr; }
+  }
+</style>
 </head>
 <body>
 
@@ -640,8 +901,11 @@
 
   <div class="topbar">
     <div class="topbar-title">
-      <div class="brand-name">REACTIONER</div>
-      <div class="brand-tagline">Capture ❤️ / 👍 / 👎 reactions to your value props during customer interviews — read each line aloud, watch the heatmap reveal what actually resonates.</div>
+      <div class="brand-mark" aria-hidden="true">❤️</div>
+      <div>
+        <div class="brand-name">Reactioner</div>
+        <div class="brand-tagline">Read your value props aloud in customer interviews, tap ❤️ 👍 👎, and let the heatmap show what actually resonates.</div>
+      </div>
     </div>
     <div class="topbar-right">
       <label class="field-label" style="margin:0">Cycle:</label>
@@ -654,23 +918,23 @@
 
   <div class="tabs">
     <button class="tab active" data-view="interview">🎤 Interview</button>
-    <button class="tab" data-view="heatmap">🔥 Heatmap</button>
-    <button class="tab" data-view="share">🔗 Share with participant</button>
-    <button class="tab" data-view="edit">✏️ Edit slides</button>
-    <button class="tab" data-view="participants">👥 Participants</button>
+    <button class="tab" data-view="heatmap">🔥 Results</button>
+    <button class="tab" data-view="share">🔗 Share</button>
+    <button class="tab" data-view="edit">✏️ Slides</button>
+    <button class="tab" data-view="participants">👥 People</button>
     <button class="tab" data-view="settings">⚙️ Settings</button>
   </div>
 
   <!-- ============ INTERVIEW TAB ============ -->
   <div id="view-interview">
-    <details class="interview-howto">
-      <summary>How to run a Reactioner interview</summary>
+    <details class="interview-howto" id="howto-interview">
+      <summary>New here? How to run a Reactioner interview</summary>
       <ol>
-        <li>Pick the participant slot below (and optionally type their real name).</li>
-        <li>For each slide, read the items aloud in order — problem, quote, promise, feature, price.</li>
-        <li>After each one, ask their honest gut reaction (❤️ love / 👍 like / 👎 dislike) and tap the matching button. The notes box is private to you.</li>
-        <li>Move to the next slide once every reaction is captured.</li>
-        <li>When done, open the <strong>🔥 Heatmap</strong> tab to see what landed across all participants, or <strong>🔗 Share with participant</strong> to send the slides to someone to react on their own phone.</li>
+        <li><strong>Set up your slides first.</strong> If this cycle is empty, open the <strong>✏️ Slides</strong> tab and add your value props (or import a PDF/PowerPoint from the <strong>⚙️ Settings</strong> tab).</li>
+        <li><strong>Pick who you're talking to.</strong> Choose a participant slot below and optionally type their real name.</li>
+        <li><strong>Read each line aloud, in order</strong> — the problem, the quote, the promise, each feature, then the price.</li>
+        <li><strong>Capture their gut reaction.</strong> After each line, tap ❤️ (loved it), 👍 (liked it), or 👎 (didn't land). The notes box beside it is private to you.</li>
+        <li><strong>See what resonated.</strong> When you're done, open <strong>🔥 Results</strong> for the heatmap, or use <strong>🔗 Share</strong> to send the slides to someone to react on their own phone.</li>
       </ol>
     </details>
     <div class="panel">
@@ -707,6 +971,11 @@
 
   <!-- ============ HEATMAP TAB ============ -->
   <div id="view-heatmap" style="display:none">
+    <div class="help-callout">
+      <span class="ico">🔥</span>
+      <div><strong>How to read this:</strong> each row is one line from your slides, each column is one person. Greener &amp; higher = it resonated; redder &amp; lower = it didn't land. The plain-English summary below tells you what's winning and what's falling flat. Click any cell to fix a reaction or add a note.</div>
+    </div>
+    <div id="heatmap-summary"></div>
     <div class="panel">
       <div class="heatmap-controls">
         <div>
@@ -737,49 +1006,58 @@
 
   <!-- ============ SHARE TAB ============ -->
   <div id="view-share" style="display:none">
+    <div class="help-callout">
+      <span class="ico">🔗</span>
+      <div>Can't sit down with someone in person? <strong>Send them the slides</strong> and they'll react on their own phone. It works in two steps: first you send the slides (Step 1), then they send their reactions back to you and you import them (Step 2).</div>
+    </div>
+
     <div class="panel">
-      <h3 style="margin-top:0">Share this cycle's slides with a participant</h3>
-      <div id="hosting-banner" style="display:none;background:#fff8e1;border:1px solid #f1c40f;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:14px;line-height:1.5">
-        <strong>Heads-up:</strong> You opened this file directly from your hard drive (a <code>file://</code> URL). The "generate link" option below won't work for someone on a different device — they can't reach a file on your computer. <strong>Use "Download standalone participant file" instead</strong> — it produces a small HTML file you can email or text. Or, for the easiest path of all, use the same-device option.
+      <div id="hosting-banner" class="help-callout warn" style="display:none">
+        <span class="ico">⚠️</span>
+        <div><strong>Heads-up:</strong> you opened this file straight from your hard drive, so a plain link won't open on someone else's phone. Use <strong>“Download a file to send”</strong> below instead (it emails as an attachment), or hand them your own device with the <strong>In person</strong> option.</div>
       </div>
+
+      <h3 style="margin-top:0">Step 1 · Send the slides to your participant</h3>
+      <p class="section-intro">Pick whichever way is easiest for how you're reaching this person.</p>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
 
         <div class="panel" style="margin:0;background:var(--soft)">
-          <h4 style="margin-top:0">📱 Option 1 · Send to their phone (best for mobile interviews)</h4>
-          <p style="font-size:13px;color:var(--muted)">Generates a link with the slides embedded and opens your device's share sheet so you can text, WhatsApp, iMessage, or email it straight to the participant. They tap the link on their phone, react, and send the reactions back the same way.</p>
-          <button class="btn primary" id="share-link-btn" style="width:100%;margin-bottom:6px">📤 Share participant link…</button>
-          <button class="btn" id="generate-link-btn" style="width:100%;font-size:12px">Or just show me the URL to copy</button>
-          <textarea id="generated-link-output" rows="2" placeholder="(Click above to generate)" style="width:100%;margin-top:6px;font-size:11px;font-family:ui-monospace,Menlo,monospace"></textarea>
+          <h4 style="margin-top:0">📱 Text or email them a link</h4>
+          <p style="font-size:13px;color:var(--muted)">Best when they're not with you. This makes a link with your slides built in. They tap it on their phone, react, and send the results back.</p>
+          <button class="btn primary" id="share-link-btn" style="width:100%;margin-bottom:6px">📤 Share the link…</button>
+          <button class="btn" id="generate-link-btn" style="width:100%;font-size:12px">Or just show me the link to copy</button>
+          <textarea id="generated-link-output" rows="2" placeholder="(Your shareable link will appear here)" style="width:100%;margin-top:6px;font-size:11px;font-family:ui-monospace,Menlo,monospace"></textarea>
           <div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
-            <button class="btn tiny" id="copy-generated-link-btn" disabled>📋 Copy</button>
+            <button class="btn tiny" id="copy-generated-link-btn" disabled>📋 Copy link</button>
             <span id="link-length-info" style="font-size:11px;color:var(--muted);margin-left:auto"></span>
           </div>
-          <p id="link-warning" style="display:none;font-size:12px;color:#b71c1c;margin-top:6px"></p>
+          <p id="link-warning" style="display:none;font-size:12px;color:var(--dis-c);margin-top:6px"></p>
         </div>
 
         <div class="panel" style="margin:0;background:var(--soft)">
-          <h4 style="margin-top:0">🤝 Option 2 · Same device (in person)</h4>
-          <p style="font-size:13px;color:var(--muted)">You hand them your laptop, tablet, or phone. Reactions auto-sync to the selected slot — when they hand it back, the heatmap is already filled in.</p>
-          <label class="field-label">Participant slot</label>
+          <h4 style="margin-top:0">🤝 Hand them your device (in person)</h4>
+          <p style="font-size:13px;color:var(--muted)">Best when they're sitting with you. Hand over your laptop or phone — their reactions save automatically. When they hand it back, your results are already filled in.</p>
+          <label class="field-label">Save their reactions to</label>
           <select id="share-pp-target" style="width:100%;margin-bottom:10px"></select>
-          <button class="btn primary" id="open-participant-view" style="width:100%">Open participant view in this tab →</button>
-          <p style="font-size:12px;color:var(--muted);margin-top:8px">Use your browser's <em>Back</em> button when they're done to flip back to your interviewer view.</p>
+          <button class="btn primary" id="open-participant-view" style="width:100%">Hand it over →</button>
+          <p style="font-size:12px;color:var(--muted);margin-top:8px">When they're done, tap your browser's <em>Back</em> button to return here.</p>
         </div>
 
       </div>
 
       <details style="margin-top:14px">
-        <summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:13px">Advanced · Standalone HTML file (for offline / no hosting)</summary>
+        <summary style="cursor:pointer;font-weight:600;color:var(--muted);font-size:13px">Or download a file to send (works offline / no internet needed)</summary>
         <div class="panel" style="margin-top:8px;background:var(--soft)">
-          <p style="font-size:13px;color:var(--muted)">Generates a tiny self-contained HTML file you can email as an attachment. The participant opens it locally on their phone or computer — no internet needed. Useful if you're sharing this with someone who can't open links.</p>
-          <button class="btn" id="generate-standalone-btn" style="width:100%">⬇ Download standalone participant file</button>
+          <p style="font-size:13px;color:var(--muted)">Saves a small file to your computer that you can attach to an email or message. They open it on their phone or laptop and react — no internet required. Handy if a link won't reach them.</p>
+          <button class="btn" id="generate-standalone-btn" style="width:100%">⬇ Download a file to send</button>
         </div>
       </details>
+    </div>
 
-      <div class="panel" style="margin-top:14px;background:var(--soft)">
-        <h4 style="margin-top:0">📥 Import reactions from a participant</h4>
-        <p style="font-size:13px;color:var(--muted)">When the participant hits Submit on their side, they'll get a code (starting with <code>RXN-</code>) or a JSON file. Paste/upload it here and choose which slot to assign it to.</p>
+    <div class="panel">
+      <h3 style="margin-top:0">Step 2 · Bring their reactions back in</h3>
+      <p class="section-intro">When they finish, they'll get a short code (it starts with <code>RXN-</code>) or a small file. Paste the code or upload the file here, choose who it's from, and their reactions drop straight into your results.</p>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div>
             <label class="field-label">Paste reactions code</label>
@@ -799,16 +1077,34 @@
         </div>
       </div>
     </div>
-  </div>
 
   <!-- ============ EDIT TAB ============ -->
   <div id="view-edit" style="display:none">
+    <div class="help-callout">
+      <span class="ico">✏️</span>
+      <div>Each <strong>slide</strong> is one idea you want to test. Keep it to a few short lines a person can react to. A good slide usually has: a <strong>Headline</strong> (the problem), a <strong>Pain quote</strong> (how a real customer describes it), a <strong>Promise</strong> (the outcome you offer), one or two <strong>Features</strong>, and a <strong>Price</strong>. Don't have all of these? That's fine — add only the lines you want, in any order.</div>
+    </div>
+
+    <details class="interview-howto" style="margin-bottom:16px">
+      <summary>See an example slide</summary>
+      <div style="padding:14px 18px 16px">
+        <div class="steps">
+          <div class="step"><span class="num">H</span><div class="step-body"><strong>Headline:</strong> “Scheduling staff every week eats your whole Sunday.”</div></div>
+          <div class="step"><span class="num">“”</span><div class="step-body"><strong>Pain quote:</strong> “I spend 3 hours every Sunday on the schedule, and someone still no-shows.”</div></div>
+          <div class="step"><span class="num">→</span><div class="step-body"><strong>Promise:</strong> “Build next week's schedule in 10 minutes — and fill no-shows automatically.”</div></div>
+          <div class="step"><span class="num">★</span><div class="step-body"><strong>Feature:</strong> “One-tap shift swaps your team approves from their phones.”</div></div>
+          <div class="step"><span class="num">$</span><div class="step-body"><strong>Price:</strong> “$49/month for your whole location.”</div></div>
+        </div>
+        <p style="font-size:13px;color:var(--muted);margin:14px 0 0">In a hurry? Use <strong>⚙️ Settings → Import slides</strong> to pull these straight from an existing PDF or PowerPoint.</p>
+      </div>
+    </details>
+
     <div class="panel">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
-        <h3 style="margin:0">Edit slides for this cycle</h3>
-        <div style="display:flex;gap:6px">
-          <button class="btn" id="copy-from-cycle">Copy slides from another cycle…</button>
-          <button class="btn primary" id="add-slide">+ Add new slide</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <h3 style="margin:0">Your slides</h3>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="btn" id="copy-from-cycle">Copy from another cycle…</button>
+          <button class="btn primary" id="add-slide">+ Add a slide</button>
         </div>
       </div>
       <div id="edit-slides-container"></div>
@@ -817,9 +1113,12 @@
 
   <!-- ============ PARTICIPANTS TAB ============ -->
   <div id="view-participants" style="display:none">
+    <div class="help-callout">
+      <span class="ico">👥</span>
+      <div>Add a slot for each person you're going to interview. Each one becomes a <strong>column</strong> in your Results heatmap, so you can compare reactions side by side. The short <strong>label</strong> (like P1, P2) keeps it tidy; the <strong>real name</strong> is optional and just for your memory.</div>
+    </div>
     <div class="panel">
-      <h3 style="margin-top:0">Participants for this cycle</h3>
-      <p style="color:var(--muted);font-size:13px">Each participant becomes a column in the heatmap.</p>
+      <h3 style="margin-top:0">People in this cycle</h3>
       <div id="participants-list"></div>
       <button class="btn primary" id="add-participant" style="margin-top:8px">+ Add participant</button>
     </div>
@@ -1759,6 +2058,76 @@ function renderHeatmap() {
   });
   renderHeatmapLegend();
   renderPdfFilterDropdown();
+  renderHeatmapSummary();
+}
+
+/* Plain-language read-out of the heatmap so a non-technical founder
+   immediately knows what resonated and what fell flat. */
+function renderHeatmapSummary() {
+  const wrap = document.getElementById('heatmap-summary');
+  if (!wrap) return;
+  const c = activeCycle();
+
+  // Collect every statement (incl. headline) with its aggregate reactions.
+  const rows = [];
+  let totalReactions = 0;
+  for (const slide of c.slides) {
+    let fIdx = 0;
+    const stmts = [{ id: 'headline', type: 'headline', text: slide.headline, label: 'Headline' }];
+    for (const st of slide.statements) {
+      let lbl;
+      if (st.type === 'feature') { fIdx++; lbl = 'Feature ' + fIdx; }
+      else lbl = (STATEMENT_TYPES.find(t => t.key === st.type) || {}).label || 'Statement';
+      stmts.push({ id: st.id, type: st.type, text: st.text, label: lbl });
+    }
+    for (const st of stmts) {
+      let score = 0, loves = 0, likes = 0, dislikes = 0, n = 0;
+      for (const p of c.participants) {
+        const r = c.reactions[rkey(p.id, slide.id, st.id)];
+        if (r && r.reaction) {
+          n++; totalReactions++;
+          score += reactionToScore(r.reaction);
+          if (r.reaction === 'love') loves++;
+          else if (r.reaction === 'like') likes++;
+          else if (r.reaction === 'dislike') dislikes++;
+        }
+      }
+      if (n > 0) rows.push({ text: st.text, label: st.label, headline: slide.headline, color: slide.color, score, loves, likes, dislikes, n });
+    }
+  }
+
+  if (totalReactions === 0) {
+    wrap.innerHTML = '<div class="help-callout" style="margin-bottom:0">'
+      + '<span class="ico">📊</span>'
+      + '<div>No reactions captured yet. Run an interview (or share the slides with someone), and this is where you\'ll see a plain-English summary of what landed and what didn\'t.</div>'
+      + '</div>';
+    return;
+  }
+
+  const wins = rows.filter(r => r.score > 0).sort((a, b) => b.score - a.score || b.n - a.n).slice(0, 3);
+  const flops = rows.filter(r => r.score < 0).sort((a, b) => a.score - b.score || b.n - a.n).slice(0, 3);
+
+  const item = (r) => {
+    const counts = [];
+    if (r.loves) counts.push('❤️' + r.loves);
+    if (r.likes) counts.push('👍' + r.likes);
+    if (r.dislikes) counts.push('👎' + r.dislikes);
+    return '<li><span style="color:' + r.color + '">●</span> '
+      + '<strong>' + escapeHtml(r.label) + ':</strong> ' + escapeHtml(r.text)
+      + ' <span class="hm-sum-meta" style="display:block;margin-left:14px">' + counts.join('  ') + ' · score ' + (r.score > 0 ? '+' + r.score : r.score) + '</span></li>';
+  };
+
+  wrap.innerHTML =
+    '<div class="hm-summary-grid">'
+    + '<div class="hm-sum-card win"><h4>✅ What\'s resonating most</h4>'
+    +   (wins.length ? '<ol>' + wins.map(item).join('') + '</ol>'
+                     : '<div class="muted-empty">Nothing has a clearly positive score yet.</div>')
+    + '</div>'
+    + '<div class="hm-sum-card flop"><h4>⚠️ What\'s falling flat</h4>'
+    +   (flops.length ? '<ol>' + flops.map(item).join('') + '</ol>'
+                      : '<div class="muted-empty">Nothing is landing negatively — good sign!</div>')
+    + '</div>'
+    + '</div>';
 }
 function renderHeatmapLegend() {
   const sm = state.scoreMap;
@@ -3047,6 +3416,51 @@ render();
 </html>`;
 }
 
+/* ---- FIRST-RUN ONBOARDING ----
+   A friendly welcome shown once per browser so a non-technical founder
+   knows exactly where to begin. Self-contained; uses its own DOM + a
+   localStorage flag, and never blocks the underlying tool. */
+function maybeShowOnboarding() {
+  const FLAG = 'reactioner-onboarded-v1';
+  try { if (localStorage.getItem(FLAG)) return; } catch (e) {}
+
+  const back = document.createElement('div');
+  back.className = 'onb-back';
+  back.innerHTML =
+    '<div class="onb-card" role="dialog" aria-modal="true" aria-label="Welcome to Reactioner">'
+    + '<div class="onb-head">'
+    +   '<div class="onb-mark">❤️ 👍 👎</div>'
+    +   '<h2>Welcome to Reactioner</h2>'
+    +   '<p>A simple way to find out which of your ideas customers actually care about. Here\'s the whole thing in four steps:</p>'
+    + '</div>'
+    + '<div class="onb-body"><div class="steps">'
+    +   '<div class="step"><span class="num">1</span><div class="step-body"><strong>Add your slides.</strong> In the <em>✏️ Slides</em> tab, write the value props you want to test — or import a PDF/PowerPoint in <em>⚙️ Settings</em>.</div></div>'
+    +   '<div class="step"><span class="num">2</span><div class="step-body"><strong>Add the people</strong> you\'ll talk to in the <em>👥 People</em> tab (one slot each).</div></div>'
+    +   '<div class="step"><span class="num">3</span><div class="step-body"><strong>Run the interview.</strong> In <em>🎤 Interview</em>, read each line aloud and tap ❤️ 👍 👎 for their reaction. Can\'t meet in person? Use <em>🔗 Share</em> to send the slides to their phone.</div></div>'
+    +   '<div class="step"><span class="num">4</span><div class="step-body"><strong>See what won.</strong> Open <em>🔥 Results</em> for a color heatmap and a plain-English summary of what resonated.</div></div>'
+    + '</div></div>'
+    + '<div class="onb-foot">'
+    +   '<button class="btn primary" id="onb-start">Got it — let\'s start</button>'
+    +   '<button class="onb-skip" id="onb-skip">Skip</button>'
+    + '</div>'
+    + '</div>';
+  document.body.appendChild(back);
+  requestAnimationFrame(() => back.classList.add('show'));
+
+  const dismiss = (goToSlides) => {
+    try { localStorage.setItem(FLAG, '1'); } catch (e) {}
+    back.classList.remove('show');
+    setTimeout(() => back.remove(), 200);
+    if (goToSlides) {
+      const c = activeCycle();
+      if (c && (!c.slides || c.slides.length === 0)) setView('edit');
+    }
+  };
+  back.querySelector('#onb-start').addEventListener('click', () => dismiss(true));
+  back.querySelector('#onb-skip').addEventListener('click', () => dismiss(false));
+  back.addEventListener('click', (e) => { if (e.target === back) dismiss(false); });
+}
+
 /* ---- INIT ---- */
 rerenderInterviewer = function () {
   renderCycleSelect();
@@ -3054,6 +3468,7 @@ rerenderInterviewer = function () {
 };
 renderCycleSelect();
 setView(state.activeView || 'interview');
+maybeShowOnboarding();
 
 } // end initInterviewerMode
 
