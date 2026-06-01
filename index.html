@@ -815,6 +815,27 @@
 
   .section-intro { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 0 0 16px; }
 
+  /* Interviewee language picker (Share tab) */
+  .lang-picker {
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+    flex-wrap: wrap;
+    background: var(--accent-soft);
+    border: 1px solid #d9dcfb;
+    border-radius: 12px;
+    padding: 12px 15px;
+    margin-bottom: 12px;
+  }
+  .lang-picker select { background: #fff; font-weight: 600; }
+  #pp-lang-note { align-items: flex-start; }
+  /* Participant "translating" splash */
+  .pp-translating { text-align: center; padding: 48px 24px; color: var(--muted); }
+  .pp-translating .spin {
+    width: 34px; height: 34px; margin: 0 auto 16px;
+    border: 3px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: ppspin 0.8s linear infinite;
+  }
+  @keyframes ppspin { to { transform: rotate(360deg); } }
+
   /* ---------- Interview slide / statements ---------- */
   .slide-card { border-radius: var(--radius); border: 1px solid var(--border); border-top-width: 6px; padding: 24px; }
   .slide-card h2.headline { font-size: 23px; }
@@ -1020,6 +1041,22 @@
       <h3 style="margin-top:0">Step 1 · Send the slides to your participant</h3>
       <p class="section-intro">Pick whichever way is easiest for how you're reaching this person.</p>
 
+      <div class="lang-picker">
+        <div>
+          <label class="field-label" style="margin-bottom:2px">🌐 Show the slides to them in</label>
+          <div style="font-size:12px;color:var(--muted)">Their buttons &amp; instructions, plus an auto-translation of your slide wording.</div>
+        </div>
+        <select id="pp-lang" style="min-width:210px">
+          <option value="en">English</option>
+          <option value="es">Español (Centroamérica)</option>
+          <option value="fr">Français</option>
+        </select>
+      </div>
+      <p id="pp-lang-note" class="help-callout warn" style="display:none">
+        <span class="ico">🌐</span>
+        <span>Slide wording is machine-translated when they open it, so it needs internet and may read a little roughly — especially regional Spanish. The buttons and instructions are professionally translated. Want it exact? Edit the wording yourself after seeing the draft.</span>
+      </p>
+
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
 
         <div class="panel" style="margin:0;background:var(--soft)">
@@ -1199,6 +1236,89 @@
 const STORAGE_KEY = 'validation-tool-v3';
 const PP_STORAGE_KEY = 'validation-tool-pp-session-v1';
 const DEFAULT_SCORE_MAP = { love: 3, like: 1, dislike: -1 };
+
+/* ============================================================
+   INTERVIEWEE LANGUAGES (auto-translation for shared links)
+   The interviewer picks a language in the Share tab; the
+   participant view shows its buttons/instructions from this
+   dictionary and machine-translates the slide wording online.
+   ============================================================ */
+const PP_LANGS = ['en', 'es', 'fr'];
+const PP_I18N = {
+  en: {
+    welcome: '👋 Welcome', intro: "You'll see a few short statements. For each one, tap how you feel: ❤️ love it, 👍 like it, or 👎 not for me. There are no wrong answers!",
+    name: 'Your name (optional)', start: 'Start →', back: '← Back', next: 'Next →', finish: 'Finish',
+    done: '🎉 All done', thanks: 'Thanks for sharing your reactions. Please send them back to the person who invited you:',
+    copy: '📋 Copy my reactions code', download: '⬇ Download as file', share: '📤 Share',
+    sendBack: 'Copy the code above (or download the file) and send it back via email or text.',
+    backToSlides: '← Back to slides', copied: 'Code copied', copyFail: 'Copy failed — select & copy manually',
+    translating: 'Preparing your version…', noSlides: 'No slides found', broken: "Couldn't load the slides — ask for a fresh link."
+  },
+  es: {
+    welcome: '👋 Bienvenido/a', intro: 'Verás algunas frases cortas. En cada una, toca cómo te sientes: ❤️ me encanta, 👍 me gusta o 👎 no es para mí. ¡No hay respuestas incorrectas!',
+    name: 'Tu nombre (opcional)', start: 'Empezar →', back: '← Atrás', next: 'Siguiente →', finish: 'Finalizar',
+    done: '🎉 ¡Listo!', thanks: 'Gracias por compartir tus reacciones. Por favor, envíaselas a la persona que te invitó:',
+    copy: '📋 Copiar mi código de reacciones', download: '⬇ Descargar como archivo', share: '📤 Compartir',
+    sendBack: 'Copia el código de arriba (o descarga el archivo) y envíalo por correo o mensaje.',
+    backToSlides: '← Volver a las frases', copied: 'Código copiado', copyFail: 'No se pudo copiar — selecciónalo y cópialo manualmente',
+    translating: 'Preparando tu versión…', noSlides: 'No se encontraron frases', broken: 'No se pudieron cargar las frases — pide un enlace nuevo.'
+  },
+  fr: {
+    welcome: '👋 Bienvenue', intro: 'Vous verrez quelques courtes phrases. Pour chacune, indiquez votre ressenti : ❤️ j’adore, 👍 j’aime, ou 👎 pas pour moi. Il n’y a pas de mauvaise réponse !',
+    name: 'Votre nom (facultatif)', start: 'Commencer →', back: '← Retour', next: 'Suivant →', finish: 'Terminer',
+    done: '🎉 Terminé !', thanks: 'Merci d’avoir partagé vos réactions. Veuillez les renvoyer à la personne qui vous a invité :',
+    copy: '📋 Copier mon code de réactions', download: '⬇ Télécharger en fichier', share: '📤 Partager',
+    sendBack: 'Copiez le code ci-dessus (ou téléchargez le fichier) et renvoyez-le par e-mail ou message.',
+    backToSlides: '← Revenir aux phrases', copied: 'Code copié', copyFail: 'Échec de la copie — sélectionnez et copiez manuellement',
+    translating: 'Préparation de votre version…', noSlides: 'Aucune phrase trouvée', broken: 'Impossible de charger les phrases — demandez un nouveau lien.'
+  }
+};
+function ppT(lang, key) {
+  const L = PP_I18N[lang] ? lang : 'en';
+  return (PP_I18N[L][key] != null) ? PP_I18N[L][key] : PP_I18N.en[key];
+}
+
+/* Machine-translate a single string via MyMemory (free, no API key).
+   Results are cached in memory + localStorage; on any failure the
+   original English text is returned so the interview never breaks. */
+const _mtCache = {};
+function _mtKey(lang, text) { return lang + '::' + text; }
+async function mtTranslate(text, lang) {
+  const clean = (text == null) ? '' : String(text);
+  if (!clean.trim() || lang === 'en') return clean;
+  const key = _mtKey(lang, clean);
+  if (_mtCache[key] != null) return _mtCache[key];
+  try { const ls = localStorage.getItem('mt-' + key); if (ls != null) { _mtCache[key] = ls; return ls; } } catch (e) {}
+  try {
+    const url = 'https://api.mymemory.translated.net/get?q=' + encodeURIComponent(clean) + '&langpair=en|' + lang;
+    const res = await fetch(url);
+    const json = await res.json();
+    let out = json && json.responseData && json.responseData.translatedText ? json.responseData.translatedText : '';
+    // MyMemory sometimes returns an ALL-CAPS warning string on quota errors
+    if (!out || /MYMEMORY WARNING|QUERY LENGTH LIMIT|INVALID/i.test(out)) out = clean;
+    _mtCache[key] = out;
+    try { localStorage.setItem('mt-' + key, out); } catch (e) {}
+    return out;
+  } catch (e) {
+    _mtCache[key] = clean;
+    return clean;
+  }
+}
+/* Return a deep copy of the slides with headline + statement text
+   translated. IDs are preserved so reactions still map correctly. */
+async function translateSlidesContent(slides, lang) {
+  if (lang === 'en' || !Array.isArray(slides)) return slides;
+  const copy = JSON.parse(JSON.stringify(slides));
+  const jobs = [];
+  for (const s of copy) {
+    jobs.push(mtTranslate(s.headline, lang).then(t => { s.headline = t; }));
+    for (const st of (s.statements || [])) {
+      jobs.push(mtTranslate(st.text, lang).then(t => { st.text = t; }));
+    }
+  }
+  try { await Promise.all(jobs); } catch (e) {}
+  return copy;
+}
 
 /* ============================================================
    CLOUD SYNC + ACCOUNTS (Supabase)
@@ -2281,6 +2401,14 @@ function renderShare() {
   sel2.innerHTML = opts;
   document.getElementById('generated-link-output').value = '';
   document.getElementById('hosting-banner').style.display = isLocalFile ? '' : 'none';
+  const langNote = document.getElementById('pp-lang-note');
+  const langSel = document.getElementById('pp-lang');
+  if (langSel && langNote && !langSel._wired) {
+    langSel._wired = true;
+    const sync = () => { langNote.style.display = (langSel.value && langSel.value !== 'en') ? 'flex' : 'none'; };
+    langSel.addEventListener('change', sync);
+    sync();
+  }
 }
 
 document.getElementById('open-participant-view').addEventListener('click', () => {
@@ -2292,15 +2420,22 @@ document.getElementById('open-participant-view').addEventListener('click', () =>
   newUrl.searchParams.set('view', 'participant');
   newUrl.searchParams.set('pp', targetPp);
   newUrl.searchParams.set('local', '1');
+  const lang = shareLang();
+  if (lang && lang !== 'en') newUrl.searchParams.set('lang', lang);
   window.location.href = newUrl.toString();
 });
 
+function shareLang() {
+  const el = document.getElementById('pp-lang');
+  return (el && el.value) ? el.value : 'en';
+}
 async function buildParticipantUrl() {
   const c = activeCycle();
   const slidesPayload = { cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap };
   const data = await encodePayloadCompressed(slidesPayload);
   const base = window.location.href.split(/[?#]/)[0];
-  return `${base}?view=participant&data=${data}`;
+  const lang = shareLang();
+  return `${base}?view=participant&data=${data}` + (lang && lang !== 'en' ? `&lang=${lang}` : '');
 }
 
 function updateLinkLengthInfo(currentUrl) {
@@ -2372,9 +2507,15 @@ document.getElementById('share-link-btn').addEventListener('click', async () => 
   }
 });
 
-document.getElementById('generate-standalone-btn').addEventListener('click', () => {
+document.getElementById('generate-standalone-btn').addEventListener('click', async () => {
   const c = activeCycle();
-  const html = buildStandaloneParticipantHtml(c.slides, c.name, state.scoreMap);
+  const lang = shareLang();
+  let slidesForFile = c.slides;
+  if (lang !== 'en') {
+    showToast('Translating slides…');
+    try { slidesForFile = await translateSlidesContent(c.slides, lang); } catch (e) {}
+  }
+  const html = buildStandaloneParticipantHtml(slidesForFile, c.name, state.scoreMap);
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -3483,6 +3624,9 @@ async function initParticipantMode() {
   const dataParam = params.get('data');
   const localMode = params.get('local') === '1';
   const ppParam = params.get('pp');
+  const langRaw = (params.get('lang') || 'en').toLowerCase();
+  const ppLang = PP_LANGS.indexOf(langRaw) !== -1 ? langRaw : 'en';
+  document.documentElement.lang = ppLang;
 
   let slides, cycleName = '', scoreMap = { ...DEFAULT_SCORE_MAP }, ppName = '';
   let targetParticipantId = null;
@@ -3509,13 +3653,72 @@ async function initParticipantMode() {
     return;
   }
 
+  // Auto-translate the slide wording for non-English interviewees.
+  if (ppLang !== 'en' && Array.isArray(slides)) {
+    root.innerHTML = '<div class="pp-translating"><div class="spin"></div>' + escapeHtml(ppT(ppLang, 'translating')) + '</div>';
+    try { slides = await translateSlidesContent(slides, ppLang); } catch (e) {}
+  }
+
   // Restore any partial in-progress reactions (per-link or per-localPpId)
-  const sessionKey = PP_STORAGE_KEY + ':' + (localMode ? ('local-' + targetParticipantId) : ('link-' + dataParam.slice(0, 16)));
+  const sessionKey = PP_STORAGE_KEY + ':' + (localMode ? ('local-' + targetParticipantId) : ('link-' + dataParam.slice(0, 16))) + (ppLang !== 'en' ? '-' + ppLang : '');
   let ppState = (() => {
     try { return JSON.parse(localStorage.getItem(sessionKey)) || { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
     catch { return { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
   })();
   function ppSave() { try { localStorage.setItem(sessionKey, JSON.stringify(ppState)); } catch (e) {} }
+
+  /* Localized interface copy for the interviewee view. */
+  const PT_ALL = {
+    en: {
+      wTitle: "Hi! 👋 Thanks for helping out.", wIntro: "This takes about <strong>3 minutes</strong>. Here's how it works:",
+      s1: "Read each slide.", s1count: function (n) { return n === 1 ? "There is 1 slide total." : "There are " + n + " slides total."; },
+      s2: "Tap one emoji next to each line:", posSuper: "super positive", posPos: "positive", posNeg: "negative",
+      skip: "Skip any lines you don't have an opinion on. There are no wrong answers.",
+      s3: "Send your reactions back at the end with one tap (Messages, WhatsApp, email — whatever's easiest).",
+      namePh: "Your name (optional)", go: "Let's go →", topic: "Topic:",
+      slideOf: function (i, n) { return "Slide " + i + " of " + n; }, prev: "← Previous", next: "Next slide →", doneNav: "Done →",
+      dTitle: "You're done! 🙌", thanksName: function (nm) { return "Thanks, " + nm + "!"; }, thanksNo: "Thank you!",
+      oneMore: "<strong>👉 One more step:</strong> Send your reactions back to the interviewer. Pick whichever's easiest:",
+      shareBtn: "📤 Share (Messages, WhatsApp…)", sms: "💬 Send as text message", email: "📧 Send by email",
+      afterSent: "Once you've sent it, you can close this page.", copyManual: "Or copy the code manually to paste somewhere",
+      copyCode: "📋 Copy code", downloadFile: "⬇ Download as file", goBack: "← Go back to change a reaction",
+      toastCopiedClip: "Code copied to clipboard", toastShareCancel: "Share cancelled", toastCopied: "Code copied", toastCopyFail: "Copy failed — select & copy manually",
+      lThanks: "Thanks! 🙌", lSaved: "Your reactions have been saved. You can hand the device back to the interviewer.", lBack: "← Back to slides"
+    },
+    es: {
+      wTitle: "¡Hola! 👋 Gracias por ayudar.", wIntro: "Esto toma unos <strong>3 minutos</strong>. Así funciona:",
+      s1: "Lee cada frase.", s1count: function (n) { return n === 1 ? "Hay 1 frase en total." : "Hay " + n + " frases en total."; },
+      s2: "Toca un emoji en cada línea:", posSuper: "muy positivo", posPos: "positivo", posNeg: "negativo",
+      skip: "Salta las líneas sobre las que no tengas opinión. No hay respuestas incorrectas.",
+      s3: "Envía tus reacciones al final con un toque (Mensajes, WhatsApp, correo — lo que sea más fácil).",
+      namePh: "Tu nombre (opcional)", go: "Empezar →", topic: "Tema:",
+      slideOf: function (i, n) { return "Frase " + i + " de " + n; }, prev: "← Anterior", next: "Siguiente →", doneNav: "Listo →",
+      dTitle: "¡Terminaste! 🙌", thanksName: function (nm) { return "¡Gracias, " + nm + "!"; }, thanksNo: "¡Gracias!",
+      oneMore: "<strong>👉 Un paso más:</strong> Envía tus reacciones a quien te entrevistó. Elige lo más fácil:",
+      shareBtn: "📤 Compartir (Mensajes, WhatsApp…)", sms: "💬 Enviar por mensaje de texto", email: "📧 Enviar por correo",
+      afterSent: "Cuando lo hayas enviado, puedes cerrar esta página.", copyManual: "O copia el código manualmente para pegarlo en otro lugar",
+      copyCode: "📋 Copiar código", downloadFile: "⬇ Descargar como archivo", goBack: "← Volver para cambiar una reacción",
+      toastCopiedClip: "Código copiado al portapapeles", toastShareCancel: "Se canceló compartir", toastCopied: "Código copiado", toastCopyFail: "No se pudo copiar — selecciónalo y cópialo manualmente",
+      lThanks: "¡Gracias! 🙌", lSaved: "Tus reacciones se han guardado. Puedes devolver el dispositivo al entrevistador.", lBack: "← Volver a las frases"
+    },
+    fr: {
+      wTitle: "Bonjour ! 👋 Merci de votre aide.", wIntro: "Cela prend environ <strong>3 minutes</strong>. Voici comment ça marche :",
+      s1: "Lisez chaque phrase.", s1count: function (n) { return n === 1 ? "Il y a 1 phrase au total." : "Il y a " + n + " phrases au total."; },
+      s2: "Touchez un emoji sur chaque ligne :", posSuper: "très positif", posPos: "positif", posNeg: "négatif",
+      skip: "Passez les lignes sur lesquelles vous n'avez pas d'avis. Il n'y a pas de mauvaise réponse.",
+      s3: "Renvoyez vos réactions à la fin en un geste (Messages, WhatsApp, e-mail — au plus simple).",
+      namePh: "Votre nom (facultatif)", go: "C'est parti →", topic: "Sujet :",
+      slideOf: function (i, n) { return "Phrase " + i + " sur " + n; }, prev: "← Précédent", next: "Suivant →", doneNav: "Terminé →",
+      dTitle: "C'est terminé ! 🙌", thanksName: function (nm) { return "Merci, " + nm + " !"; }, thanksNo: "Merci !",
+      oneMore: "<strong>👉 Une dernière étape :</strong> renvoyez vos réactions à la personne qui vous a interviewé. Au plus simple :",
+      shareBtn: "📤 Partager (Messages, WhatsApp…)", sms: "💬 Envoyer par SMS", email: "📧 Envoyer par e-mail",
+      afterSent: "Une fois envoyé, vous pouvez fermer cette page.", copyManual: "Ou copiez le code manuellement pour le coller ailleurs",
+      copyCode: "📋 Copier le code", downloadFile: "⬇ Télécharger en fichier", goBack: "← Revenir pour changer une réaction",
+      toastCopiedClip: "Code copié dans le presse-papiers", toastShareCancel: "Partage annulé", toastCopied: "Code copié", toastCopyFail: "Échec de la copie — sélectionnez et copiez manuellement",
+      lThanks: "Merci ! 🙌", lSaved: "Vos réactions ont été enregistrées. Vous pouvez rendre l'appareil à l'intervieweur.", lBack: "← Revenir aux phrases"
+    }
+  };
+  const PT = PT_ALL[ppLang] || PT_ALL.en;
 
   function rxnEmoji(r) { return r === 'love' ? '❤️' : r === 'like' ? '👍' : r === 'dislike' ? '👎' : ''; }
 
@@ -3553,20 +3756,20 @@ async function initParticipantMode() {
     const slideCount = slides.length;
     root.innerHTML = `
       <div class="pp-welcome">
-        <h1>Hi! 👋 Thanks for helping out.</h1>
-        <p style="margin-bottom:18px">This takes about <strong>3 minutes</strong>. Here's how it works:</p>
+        <h1>${PT.wTitle}</h1>
+        <p style="margin-bottom:18px">${PT.wIntro}</p>
         <div style="text-align:left;max-width:420px;margin:0 auto 22px;font-size:15px;line-height:1.7">
-          <div style="display:flex;gap:12px;margin-bottom:10px"><span style="font-size:22px;flex-shrink:0">1️⃣</span><div><strong>Read each slide.</strong> There ${slideCount === 1 ? 'is 1 slide' : 'are ' + slideCount + ' slides'} total.</div></div>
-          <div style="display:flex;gap:12px;margin-bottom:10px"><span style="font-size:22px;flex-shrink:0">2️⃣</span><div><strong>Tap one emoji</strong> next to each line:<br>
-            <span style="font-size:20px">❤️</span> super positive &nbsp;
-            <span style="font-size:20px">👍</span> positive &nbsp;
-            <span style="font-size:20px">👎</span> negative<br>
-            <span style="font-size:13px;color:var(--muted)">Skip any lines you don't have an opinion on. There are no wrong answers.</span></div></div>
-          <div style="display:flex;gap:12px"><span style="font-size:22px;flex-shrink:0">3️⃣</span><div><strong>Send your reactions back</strong> at the end with one tap (Messages, WhatsApp, email — whatever's easiest).</div></div>
+          <div style="display:flex;gap:12px;margin-bottom:10px"><span style="font-size:22px;flex-shrink:0">1️⃣</span><div><strong>${PT.s1}</strong> ${PT.s1count(slideCount)}</div></div>
+          <div style="display:flex;gap:12px;margin-bottom:10px"><span style="font-size:22px;flex-shrink:0">2️⃣</span><div><strong>${PT.s2}</strong><br>
+            <span style="font-size:20px">❤️</span> ${PT.posSuper} &nbsp;
+            <span style="font-size:20px">👍</span> ${PT.posPos} &nbsp;
+            <span style="font-size:20px">👎</span> ${PT.posNeg}<br>
+            <span style="font-size:13px;color:var(--muted)">${PT.skip}</span></div></div>
+          <div style="display:flex;gap:12px"><span style="font-size:22px;flex-shrink:0">3️⃣</span><div>${PT.s3}</div></div>
         </div>
-        <input type="text" id="pp-name" placeholder="Your name (optional)" value="${escapeHtml(ppState.name)}" />
-        <div><button class="btn primary" id="pp-start" style="font-size:17px;padding:14px 32px;border-radius:10px">Let's go →</button></div>
-        ${cycleName ? `<p style="margin-top:18px;font-size:12px;color:var(--muted)">Topic: ${escapeHtml(cycleName)}</p>` : ''}
+        <input type="text" id="pp-name" placeholder="${escapeHtml(PT.namePh)}" value="${escapeHtml(ppState.name)}" />
+        <div><button class="btn primary" id="pp-start" style="font-size:17px;padding:14px 32px;border-radius:10px">${PT.go}</button></div>
+        ${cycleName ? `<p style="margin-top:18px;font-size:12px;color:var(--muted)">${PT.topic} ${escapeHtml(cycleName)}</p>` : ''}
       </div>`;
     document.getElementById('pp-name').addEventListener('input', e => { ppState.name = e.target.value; ppSave(); });
     document.getElementById('pp-start').addEventListener('click', () => { ppState.currentIdx = 0; ppSave(); render(); window.scrollTo({top:0}); });
@@ -3578,7 +3781,7 @@ async function initParticipantMode() {
     ).join('');
 
     let html = `<div class="pp-progress">
-      <span>Slide ${idx + 1} of ${slides.length}</span>
+      <span>${PT.slideOf(idx + 1, slides.length)}</span>
       <div class="pp-dots">${dots}</div>
     </div>
     <div class="pp-slide" style="--slide-accent:${slide.color}">
@@ -3593,8 +3796,8 @@ async function initParticipantMode() {
     }
     html += `</div>
     <div class="pp-nav">
-      <button id="pp-prev" ${idx === 0 ? 'disabled' : ''}>← Previous</button>
-      <button class="primary" id="pp-next">${idx === slides.length - 1 ? 'Done →' : 'Next slide →'}</button>
+      <button id="pp-prev" ${idx === 0 ? 'disabled' : ''}>${PT.prev}</button>
+      <button class="primary" id="pp-next">${idx === slides.length - 1 ? PT.doneNav : PT.next}</button>
     </div>`;
     root.innerHTML = html;
 
@@ -3633,9 +3836,9 @@ async function initParticipantMode() {
     syncToInterviewerLocalStorage();
     if (localMode) {
       root.innerHTML = `<div class="pp-done-screen">
-        <h2>Thanks! 🙌</h2>
-        <p style="color:var(--muted)">Your reactions have been saved. You can hand the device back to the interviewer.</p>
-        <p style="margin-top:18px"><button class="btn" id="pp-back">← Back to slides</button></p>
+        <h2>${PT.lThanks}</h2>
+        <p style="color:var(--muted)">${PT.lSaved}</p>
+        <p style="margin-top:18px"><button class="btn" id="pp-back">${PT.lBack}</button></p>
       </div>`;
       document.getElementById('pp-back').addEventListener('click', () => { ppState.currentIdx = slides.length - 1; ppSave(); render(); });
       return;
@@ -3663,31 +3866,31 @@ async function initParticipantMode() {
     const mailHref = 'mailto:?subject=' + encodeURIComponent('Validation interview reactions') + '&body=' + encodeURIComponent(shareMsg);
     const canShare = !!navigator.share;
     root.innerHTML = `<div class="pp-done-screen">
-      <h2>You're done! 🙌</h2>
+      <h2>${PT.dTitle}</h2>
       <div style="font-size:24px;margin:10px 0 4px">
         ${counts.love ? `❤️ ${counts.love}` : ''} &nbsp;
         ${counts.like ? `👍 ${counts.like}` : ''} &nbsp;
         ${counts.dislike ? `👎 ${counts.dislike}` : ''}
       </div>
-      <p style="color:var(--muted);margin:6px 0 4px">${ppState.name ? 'Thanks, ' + escapeHtml(ppState.name) + '!' : 'Thank you!'}</p>
+      <p style="color:var(--muted);margin:6px 0 4px">${ppState.name ? PT.thanksName(escapeHtml(ppState.name)) : PT.thanksNo}</p>
       <div style="background:#fff8e1;border:1px solid #f1c40f;padding:12px 16px;border-radius:10px;margin:14px auto 14px;max-width:440px;text-align:left;font-size:14px;line-height:1.5">
-        <strong>👉 One more step:</strong> Send your reactions back to the interviewer. Pick whichever's easiest:
+        ${PT.oneMore}
       </div>
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px">
-        ${canShare ? '<button class="btn primary" id="pp-share" style="font-size:16px;padding:14px 22px">📤 Share (Messages, WhatsApp…)</button>' : ''}
-        <a class="btn primary" href="${smsHref}" style="font-size:16px;padding:14px 22px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center">💬 Send as text message</a>
-        <a class="btn" href="${mailHref}" style="font-size:15px;padding:12px 18px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center">📧 Send by email</a>
+        ${canShare ? '<button class="btn primary" id="pp-share" style="font-size:16px;padding:14px 22px">' + PT.shareBtn + '</button>' : ''}
+        <a class="btn primary" href="${smsHref}" style="font-size:16px;padding:14px 22px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center">${PT.sms}</a>
+        <a class="btn" href="${mailHref}" style="font-size:15px;padding:12px 18px;text-decoration:none;display:inline-flex;align-items:center;justify-content:center">${PT.email}</a>
       </div>
-      <p style="font-size:13px;color:var(--muted);margin:10px 0 0">Once you've sent it, you can close this page.</p>
+      <p style="font-size:13px;color:var(--muted);margin:10px 0 0">${PT.afterSent}</p>
       <details style="margin-top:14px;text-align:left;max-width:520px;margin-left:auto;margin-right:auto">
-        <summary style="cursor:pointer;color:var(--muted);font-size:13px;text-align:center">Or copy the code manually to paste somewhere</summary>
+        <summary style="cursor:pointer;color:var(--muted);font-size:13px;text-align:center">${PT.copyManual}</summary>
         <div class="code-box" id="pp-code" style="margin-top:8px">${escapeHtml(code)}</div>
         <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
-          <button class="btn" id="pp-copy">📋 Copy code</button>
-          <button class="btn" id="pp-download">⬇ Download as file</button>
+          <button class="btn" id="pp-copy">${PT.copyCode}</button>
+          <button class="btn" id="pp-download">${PT.downloadFile}</button>
         </div>
       </details>
-      <div style="margin-top:22px"><button class="btn" id="pp-back2" style="font-size:13px">← Go back to change a reaction</button></div>
+      <div style="margin-top:22px"><button class="btn" id="pp-back2" style="font-size:13px">${PT.goBack}</button></div>
     </div>`;
     if (canShare) {
       document.getElementById('pp-share').addEventListener('click', async () => {
@@ -3695,15 +3898,15 @@ async function initParticipantMode() {
           await navigator.share({ title: 'Validation interview reactions', text: shareMsg });
         } catch (e) {
           if (e.name !== 'AbortError') {
-            try { await navigator.clipboard.writeText(code); ppToast('Code copied to clipboard'); }
-            catch { ppToast('Share cancelled'); }
+            try { await navigator.clipboard.writeText(code); ppToast(PT.toastCopiedClip); }
+            catch { ppToast(PT.toastShareCancel); }
           }
         }
       });
     }
     document.getElementById('pp-copy').addEventListener('click', async () => {
-      try { await navigator.clipboard.writeText(code); ppToast('Code copied'); }
-      catch { ppToast('Copy failed — select & copy manually'); }
+      try { await navigator.clipboard.writeText(code); ppToast(PT.toastCopied); }
+      catch { ppToast(PT.toastCopyFail); }
     });
     document.getElementById('pp-download').addEventListener('click', () => {
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
