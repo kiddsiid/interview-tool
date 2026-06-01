@@ -826,7 +826,26 @@
     margin-bottom: 12px;
   }
   .lang-picker select { background: #fff; font-weight: 600; }
+
+  /* Score-mapping number inputs: widen + trim padding so values
+     (including negatives) and the spinner arrows both fit. */
+  #score-love, #score-like, #score-dislike {
+    width: 72px !important;
+    padding: 8px 6px 8px 10px;
+    text-align: center;
+    font-weight: 600;
+  }
   #pp-lang-note { align-items: flex-start; }
+  /* Same-device hand-off confirmation banner (for the interviewer's eyes) */
+  .pp-handoff-check {
+    max-width: 760px; margin: 0 auto 14px;
+    background: var(--accent-soft); border: 1px solid #d9dcfb;
+    border-radius: 12px; padding: 11px 15px;
+    display: flex; align-items: center; gap: 11px;
+    font-size: 13px; color: #353a63; text-align: left;
+  }
+  .pp-handoff-check .ico { font-size: 17px; flex: none; }
+  .pp-handoff-check strong { color: var(--accent); }
   /* Participant "translating" splash */
   .pp-translating { text-align: center; padding: 48px 24px; color: var(--muted); }
   .pp-translating .spin {
@@ -3632,8 +3651,28 @@ async function initParticipantMode() {
   let targetParticipantId = null;
 
   if (localMode) {
+    // Same-device hand-off: the interviewer's data may be stored under a
+    // signed-in (user-scoped) key. The participant page reboots without
+    // signing in, so load that user's saved state before reading the cycle —
+    // otherwise we'd show the empty default ("Cycle 1", no slides).
+    if (sb) {
+      try {
+        const sess = await sb.auth.getSession();
+        const uid = sess && sess.data && sess.data.session && sess.data.session.user
+          ? sess.data.session.user.id : null;
+        if (uid) {
+          currentUserId = uid;
+          const cached = readLocalCache(uid);
+          if (cached) state = cached;
+          try {
+            const row = await cloudLoad(uid);
+            if (row && row.data && row.data.cycles && row.data.cycles.length) state = row.data;
+          } catch (e) { /* offline — keep cached copy */ }
+        }
+      } catch (e) { /* fall back to whatever state is loaded */ }
+    }
     const cyc = activeCycle();
-    if (!cyc || !cyc.slides) { root.innerHTML = '<div class="pp-welcome"><h1>No slides found</h1><p>Ask the interviewer to set up the slides first.</p></div>'; return; }
+    if (!cyc || !cyc.slides || cyc.slides.length === 0) { root.innerHTML = '<div class="pp-welcome"><h1>No slides found</h1><p>Ask the interviewer to set up the slides first.</p></div>'; return; }
     slides = JSON.parse(JSON.stringify(cyc.slides));
     cycleName = cyc.name;
     scoreMap = state.scoreMap;
@@ -3754,7 +3793,10 @@ async function initParticipantMode() {
 
   function renderWelcome() {
     const slideCount = slides.length;
-    root.innerHTML = `
+    const handoffBanner = localMode
+      ? `<div class="pp-handoff-check"><span class="ico">👀</span><div>Before handing over — confirm this is the right interview:<br><strong>Cycle:</strong> ${escapeHtml(cycleName || 'Untitled')} &nbsp;·&nbsp; <strong>${slideCount}</strong> slide${slideCount === 1 ? '' : 's'}${targetParticipantId ? ' &nbsp;·&nbsp; <strong>Saving to:</strong> ' + escapeHtml((activeCycle().participants.find(p => p.id === targetParticipantId) || {}).label || '—') : ''}</div></div>`
+      : '';
+    root.innerHTML = handoffBanner + `
       <div class="pp-welcome">
         <h1>${PT.wTitle}</h1>
         <p style="margin-bottom:18px">${PT.wIntro}</p>
