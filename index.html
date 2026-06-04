@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Reactioner" />
 <title>Reactioner — Capture customer reactions to your value props</title>
 <meta name="description" content="Reactioner — read your value props aloud in customer interviews, capture ❤️ 👍 👎 reactions, and watch a heatmap reveal what actually resonates." />
 <meta name="theme-color" content="#4f46e5" />
@@ -101,7 +105,7 @@
     padding: 8px 14px;
     border-radius: 8px;
     border: 1px solid var(--border);
-    background: white;
+    background: var(--surface);
     cursor: pointer;
     font-size: 13px;
     font-weight: 600;
@@ -122,7 +126,7 @@
     border-radius: 8px;
     font-size: 13px;
     font-family: inherit;
-    background: white;
+    background: var(--surface);
     color: var(--text);
   }
   select:focus, input:focus, textarea:focus { outline: 2px solid #d6e4ff; border-color: #4a90e2; }
@@ -165,7 +169,7 @@
     background: var(--soft);
     align-items: start;
   }
-  .statement-row.has-reaction { background: white; border-color: #c9d3df; }
+  .statement-row.has-reaction { background: var(--surface); border-color: #c9d3df; }
   .statement-row .stmt {
     display: flex;
     flex-direction: column;
@@ -183,7 +187,7 @@
     color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    background: white;
+    background: var(--surface);
     border: 1px solid var(--border);
     padding: 2px 7px;
     border-radius: 10px;
@@ -201,7 +205,7 @@
     border-radius: 6px;
     font-size: 13px;
     color: var(--muted);
-    background: white;
+    background: var(--surface);
   }
   .phrase-input:focus { color: var(--text); border-style: solid; }
   .reaction-buttons { display: flex; gap: 4px; flex-shrink: 0; }
@@ -210,7 +214,7 @@
     height: 38px;
     border-radius: 8px;
     border: 1.5px solid var(--border);
-    background: white;
+    background: var(--surface);
     cursor: pointer;
     font-size: 18px;
     display: flex;
@@ -283,7 +287,7 @@
     flex-wrap: wrap;
     margin-bottom: 12px;
   }
-  .heatmap-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: var(--shadow); background: white; }
+  .heatmap-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: var(--shadow); background: var(--surface); }
   table.heatmap {
     border-collapse: collapse;
     width: 100%;
@@ -441,7 +445,7 @@
   }
   .modal-back.show { display: flex; }
   .modal {
-    background: white;
+    background: var(--surface);
     padding: 22px;
     border-radius: 12px;
     max-width: 580px;
@@ -459,7 +463,7 @@
     padding: 20px 16px 80px;
   }
   .pp-welcome {
-    background: white;
+    background: var(--surface);
     border-radius: 14px;
     padding: 28px;
     box-shadow: var(--shadow);
@@ -499,7 +503,7 @@
   .pp-dot.active { background: var(--text); }
 
   .pp-slide {
-    background: white;
+    background: var(--surface);
     border-radius: 14px;
     box-shadow: var(--shadow);
     padding: 28px 28px 18px;
@@ -524,7 +528,7 @@
     border: 1px solid var(--border);
     flex-wrap: wrap;
   }
-  .pp-stmt.has-reaction { background: white; border-color: #b8c2cf; }
+  .pp-stmt.has-reaction { background: var(--surface); border-color: #b8c2cf; }
   .pp-stmt-text { flex: 1; font-size: 16px; line-height: 1.45; min-width: 180px; }
   .pp-stmt-text.is-headline { font-weight: 700; }
   .pp-stmt-text.is-quote    { font-style: italic; font-weight: 600; }
@@ -537,7 +541,7 @@
     font-size: 22px;
     border-radius: 12px;
     border: 2px solid var(--border);
-    background: white;
+    background: var(--surface);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -563,7 +567,7 @@
     font-size: 15px;
     border-radius: 10px;
     border: 1px solid var(--border);
-    background: white;
+    background: var(--surface);
     cursor: pointer;
     font-weight: 600;
   }
@@ -571,7 +575,7 @@
   .pp-nav button:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .pp-done-screen {
-    background: white;
+    background: var(--surface);
     border-radius: 14px;
     padding: 32px;
     box-shadow: var(--shadow);
@@ -636,6 +640,23 @@
     * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; print-color-adjust: exact !important; }
   }
   .print-header, .print-notes { display: none; }
+
+/* ===== theme tokens + dark (green) mode ===== */
+:root { --surface: #ffffff; }
+.theme-toggle { font-size: 14px; }
+[data-theme="dark"] {
+  --bg: #0f1411; --panel: #161d18; --surface: #161d18; --text: #e8efe9; --muted: #93a39a;
+  --border: #26302a; --soft: #1b231e;
+  --accent: #22c55e; --accent-soft: #15271c;
+  --brand-grad: linear-gradient(135deg, #34d399 0%, #16a34a 100%);
+  --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 10px 28px rgba(0,0,0,0.5);
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
+  --hm-0: #1b231e;
+}
+[data-theme="dark"] .btn { background: var(--surface); color: var(--text); }
+[data-theme="dark"] .btn.primary, [data-theme="dark"] .tab.active { color: #06210f; }
+[data-theme="dark"] input::placeholder, [data-theme="dark"] textarea::placeholder { color: #74837a; }
+@media print { :root, [data-theme="dark"] { --surface: #ffffff; } }
 </style>
 
 <!-- ============================================================
@@ -953,6 +974,7 @@
       <button class="btn tiny" id="add-cycle">+ New cycle</button>
       <button class="btn tiny" id="rename-cycle">Rename</button>
       <button class="btn tiny danger" id="delete-cycle">Delete</button>
+      <button class="btn tiny theme-toggle" id="theme-toggle" title="Toggle dark / light mode" aria-label="Toggle dark mode">🌙</button>
     </div>
   </div>
 
@@ -4036,6 +4058,27 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 1800);
 }
+</script>
+<script>
+/* ---- light / dark (green) theme toggle ---- */
+(function () {
+  function apply(t) {
+    t = (t === 'dark') ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+    var b = document.getElementById('theme-toggle'); if (b) b.textContent = (t === 'dark') ? '\u2600\ufe0f' : '\ud83c\udf19';
+    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', (t === 'dark') ? '#0f1411' : '#4f46e5');
+    try { localStorage.setItem('reactioner-theme', t); } catch (e) {}
+  }
+  function cur() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+  function init() {
+    var t = null; try { t = localStorage.getItem('reactioner-theme'); } catch (e) {}
+    if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    apply(t);
+  }
+  function wire() { var b = document.getElementById('theme-toggle'); if (b && !b._wired) { b._wired = 1; b.addEventListener('click', function () { apply(cur() === 'dark' ? 'light' : 'dark'); }); } }
+  init(); wire();
+  document.addEventListener('DOMContentLoaded', function () { init(); wire(); });
+})();
 </script>
 </body>
 </html>
