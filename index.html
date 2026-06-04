@@ -2396,11 +2396,18 @@ document.getElementById('hm-export-pdf').addEventListener('click', () => {
   // Ensure heatmap view is active
   if (state.activeView !== 'heatmap') setView('heatmap');
 
+  // Belt-and-suspenders: explicitly hide the account chip (Synced · email · Sign out)
+  // before printing, so it can never appear in the PDF regardless of print-CSS quirks.
+  const acct = document.getElementById('vit-account');
+  const acctPrevDisplay = acct ? acct.style.display : null;
+  if (acct) acct.style.display = 'none';
+
   // After printing, restore the unfiltered heatmap so the on-screen view is correct
   const cleanup = () => {
     renderHeatmap();
     document.getElementById('print-notes').innerHTML = '';
     document.getElementById('print-header').innerHTML = '';
+    if (acct) acct.style.display = acctPrevDisplay || 'flex';
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
