@@ -3635,6 +3635,45 @@ rerenderInterviewer = function () {
 };
 renderCycleSelect();
 setView(state.activeView || 'interview');
+
+/* ---- CRM deep-link: pre-load a contact as a participant ----
+   The Customer Discovery CRM links here with ?crmName=<contact name>.
+   We ensure a participant slot with that name exists in the active cycle,
+   select it, and drop straight into the interview view. */
+(function handleCrmDeepLink() {
+  try {
+    var params = new URLSearchParams(window.location.search);
+    var crmName = params.get('crmName');
+    if (!crmName) return;
+    crmName = crmName.trim();
+    if (!crmName) return;
+    var c = activeCycle();
+    if (!c) return;
+    var p = c.participants.find(function (x) {
+      return (x.name || '').trim().toLowerCase() === crmName.toLowerCase();
+    });
+    if (!p) {
+      p = c.participants.find(function (x) { return !(x.name || '').trim(); });
+      if (p) { p.name = crmName; }
+      else {
+        p = { id: uid(), label: 'P' + (c.participants.length + 1), name: crmName };
+        c.participants.push(p);
+      }
+    }
+    c.activeParticipantId = p.id;
+    save();
+    renderParticipantSelect();
+    setView('interview');
+    showToast('Interviewing ' + crmName + ' \u2014 loaded from your CRM');
+    if (window.history && window.history.replaceState) {
+      var u = new URL(window.location.href);
+      u.searchParams.delete('crmName');
+      u.searchParams.delete('crmInterview');
+      window.history.replaceState({}, '', u.toString());
+    }
+  } catch (e) { /* non-fatal */ }
+})();
+
 maybeShowOnboarding();
 
 } // end initInterviewerMode
