@@ -819,12 +819,12 @@
   .help-callout {
     display: flex; gap: 11px;
     background: var(--accent-soft);
-    border: 1px solid #d9dcfb;
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 13px 15px;
     font-size: 13.5px;
     line-height: 1.55;
-    color: #353a63;
+    color: var(--text);
     margin-bottom: 16px;
   }
   .help-callout .ico { font-size: 18px; flex: none; line-height: 1.4; }
@@ -841,7 +841,7 @@
     display: flex; align-items: center; justify-content: space-between; gap: 14px;
     flex-wrap: wrap;
     background: var(--accent-soft);
-    border: 1px solid #d9dcfb;
+    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 12px 15px;
     margin-bottom: 12px;
@@ -860,10 +860,10 @@
   /* Same-device hand-off confirmation banner (for the interviewer's eyes) */
   .pp-handoff-check {
     max-width: 760px; margin: 0 auto 14px;
-    background: var(--accent-soft); border: 1px solid #d9dcfb;
+    background: var(--accent-soft); border: 1px solid var(--border);
     border-radius: 12px; padding: 11px 15px;
     display: flex; align-items: center; gap: 11px;
-    font-size: 13px; color: #353a63; text-align: left;
+    font-size: 13px; color: var(--text); text-align: left;
   }
   .pp-handoff-check .ico { font-size: 17px; flex: none; }
   .pp-handoff-check strong { color: var(--accent); }
@@ -958,9 +958,9 @@
 :root { --surface: #ffffff; }
 .theme-toggle { font-size: 14px; }
 [data-theme="dark"] {
-  --bg: #0f1411; --panel: #161d18; --surface: #161d18; --text: #e8efe9; --muted: #93a39a;
+  --bg: #0f1411; --panel: #161d18; --surface: #161d18; --text: #e8efe9; --muted: #aebbb2;
   --border: #26302a; --soft: #1b231e;
-  --accent: #22c55e; --accent-soft: #15271c;
+  --accent: #22c55e; --accent-soft: #15271c; --accent-text: #4ade80;
   --brand-grad: linear-gradient(135deg, #34d399 0%, #16a34a 100%);
   --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 10px 28px rgba(0,0,0,0.5);
   --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
@@ -969,13 +969,22 @@
 [data-theme="dark"] body { background: var(--bg); }
 [data-theme="dark"] .btn { background: var(--surface); color: var(--text); }
 [data-theme="dark"] .btn.primary, [data-theme="dark"] .tab.active { color: #06210f; }
-[data-theme="dark"] input::placeholder, [data-theme="dark"] textarea::placeholder { color: #74837a; }
+/* keep primary buttons on their bright brand background so their text stays legible */
+[data-theme="dark"] .btn.primary { background: var(--brand-grad); border-color: transparent; }
+/* brighten accent-coloured text (links, labels, active pills) so blues/greens read on dark */
+[data-theme="dark"] .help-callout:not(.warn):not(.good) strong,
+[data-theme="dark"] .pp-handoff-check strong,
+[data-theme="dark"] .stmt-label,
+[data-theme="dark"] .slide-pill.active,
+[data-theme="dark"] .tab:hover:not(.active),
+[data-theme="dark"] .btn:not(.primary):hover { color: var(--accent-text); }
+[data-theme="dark"] input::placeholder, [data-theme="dark"] textarea::placeholder { color: #8a988f; }
 
 /* ===== Midnight scheme (deep indigo) — overrides Green when data-scheme="midnight" ===== */
 [data-theme="dark"][data-scheme="midnight"] {
-  --bg: #0b1020; --panel: #131a2e; --surface: #131a2e; --text: #e6eaf5; --muted: #8b95b2;
+  --bg: #0b1020; --panel: #131a2e; --surface: #131a2e; --text: #e6eaf5; --muted: #aab4d0;
   --border: #283250; --soft: #161e36;
-  --accent: #6366f1; --accent-soft: #1e2547;
+  --accent: #6366f1; --accent-soft: #1e2547; --accent-text: #b4c0ff;
   --brand-grad: linear-gradient(135deg, #818cf8 0%, #4f46e5 100%);
   --hm-0: #161e36;
 }
@@ -1333,13 +1342,13 @@ const PP_I18N = {
     translating: 'Preparing your version…', noSlides: 'No slides found', broken: "Couldn't load the slides — ask for a fresh link."
   },
   es: {
-    welcome: '👋 Bienvenido/a', intro: 'Verás algunas frases cortas. En cada una, toca cómo te sientes: ❤️ me encanta, 👍 me gusta o 👎 no es para mí. ¡No hay respuestas incorrectas!',
-    name: 'Tu nombre (opcional)', start: 'Empezar →', back: '← Atrás', next: 'Siguiente →', finish: 'Finalizar',
-    done: '🎉 ¡Listo!', thanks: 'Gracias por compartir tus reacciones. Por favor, envíaselas a la persona que te invitó:',
+    welcome: '👋 Bienvenido/a', intro: 'Verá algunas frases cortas. En cada una, toque cómo se siente: ❤️ me encanta, 👍 me gusta o 👎 no es para mí. ¡No hay respuestas incorrectas!',
+    name: 'Su nombre (opcional)', start: 'Empezar →', back: '← Atrás', next: 'Siguiente →', finish: 'Finalizar',
+    done: '🎉 ¡Listo!', thanks: 'Gracias por compartir sus reacciones. Por favor, envíeselas a la persona que le invitó:',
     copy: '📋 Copiar mi código de reacciones', download: '⬇ Descargar como archivo', share: '📤 Compartir',
-    sendBack: 'Copia el código de arriba (o descarga el archivo) y envíalo por correo o mensaje.',
-    backToSlides: '← Volver a las frases', copied: 'Código copiado', copyFail: 'No se pudo copiar — selecciónalo y cópialo manualmente',
-    translating: 'Preparando tu versión…', noSlides: 'No se encontraron frases', broken: 'No se pudieron cargar las frases — pide un enlace nuevo.'
+    sendBack: 'Copie el código de arriba (o descargue el archivo) y envíelo por correo o mensaje.',
+    backToSlides: '← Volver a las frases', copied: 'Código copiado', copyFail: 'No se pudo copiar — selecciónelo y cópielo manualmente',
+    translating: 'Preparando su versión…', noSlides: 'No se encontraron frases', broken: 'No se pudieron cargar las frases — pida un enlace nuevo.'
   },
   fr: {
     welcome: '👋 Bienvenue', intro: 'Vous verrez quelques courtes phrases. Pour chacune, indiquez votre ressenti : ❤️ j’adore, 👍 j’aime, ou 👎 pas pour moi. Il n’y a pas de mauvaise réponse !',
@@ -3838,27 +3847,27 @@ async function initParticipantMode() {
       tlStatement: "Statement", thStatement: "React with your honest gut feeling — love it, like it, or not for you."
     },
     es: {
-      wTitle: "¡Hola! 👋 Gracias por ayudar.", wIntro: "Esto toma unos <strong>3 minutos</strong>. Así funciona:",
-      s1: "Lee cada frase.", s1count: function (n) { return n === 1 ? "Hay 1 frase en total." : "Hay " + n + " frases en total."; },
-      s2: "Toca un emoji en cada línea:", posSuper: "muy positivo", posPos: "positivo", posNeg: "negativo",
-      skip: "Salta las líneas sobre las que no tengas opinión. No hay respuestas incorrectas.",
-      s3: "Envía tus reacciones al final con un toque (Mensajes, WhatsApp, correo — lo que sea más fácil).",
-      namePh: "Tu nombre (opcional)", go: "Empezar →", topic: "Tema:",
+      wTitle: "¡Hola! 👋 Gracias por su ayuda.", wIntro: "Esto le tomará unos <strong>3 minutos</strong>. Así funciona:",
+      s1: "Lea cada frase.", s1count: function (n) { return n === 1 ? "Hay 1 frase en total." : "Hay " + n + " frases en total."; },
+      s2: "Toque un emoji en cada línea:", posSuper: "muy positivo", posPos: "positivo", posNeg: "negativo",
+      skip: "Omita las líneas sobre las que no tenga opinión. No hay respuestas incorrectas.",
+      s3: "Envíe sus reacciones al final con un toque (Mensajes, WhatsApp, correo — lo que le resulte más fácil).",
+      namePh: "Su nombre (opcional)", go: "Empezar →", topic: "Tema:",
       slideOf: function (i, n) { return "Frase " + i + " de " + n; }, prev: "← Anterior", next: "Siguiente →", doneNav: "Listo →",
-      dTitle: "¡Terminaste! 🙌", thanksName: function (nm) { return "¡Gracias, " + nm + "!"; }, thanksNo: "¡Gracias!",
-      oneMore: "<strong>👉 Un paso más:</strong> Envía tus reacciones a quien te entrevistó. Elige lo más fácil:",
+      dTitle: "¡Ha terminado! 🙌", thanksName: function (nm) { return "¡Gracias, " + nm + "!"; }, thanksNo: "¡Gracias!",
+      oneMore: "<strong>👉 Un paso más:</strong> Envíe sus reacciones a quien le entrevistó. Elija lo más fácil:",
       shareBtn: "📤 Compartir (Mensajes, WhatsApp…)", sms: "💬 Enviar por mensaje de texto", email: "📧 Enviar por correo",
-      afterSent: "Cuando lo hayas enviado, puedes cerrar esta página.", copyManual: "O copia el código manualmente para pegarlo en otro lugar",
+      afterSent: "Cuando lo haya enviado, puede cerrar esta página.", copyManual: "O copie el código manualmente para pegarlo en otro lugar",
       copyCode: "📋 Copiar código", downloadFile: "⬇ Descargar como archivo", goBack: "← Volver para cambiar una reacción",
-      toastCopiedClip: "Código copiado al portapapeles", toastShareCancel: "Se canceló compartir", toastCopied: "Código copiado", toastCopyFail: "No se pudo copiar — selecciónalo y cópialo manualmente",
-      lThanks: "¡Gracias! 🙌", lSaved: "Tus reacciones se han guardado. Puedes devolver el dispositivo al entrevistador.", lBack: "← Volver a las frases",
+      toastCopiedClip: "Código copiado al portapapeles", toastShareCancel: "Se canceló compartir", toastCopied: "Código copiado", toastCopyFail: "No se pudo copiar — selecciónelo y cópielo manualmente",
+      lThanks: "¡Gracias! 🙌", lSaved: "Sus reacciones se han guardado. Puede devolver el dispositivo al entrevistador.", lBack: "← Volver a las frases",
       whatIsThis: "¿Qué es esto?",
-      tlHeadline: "La idea principal", thHeadline: "El título — el concepto central que se presenta. Reacciona según lo que te haga sentir la idea en sí.",
-      tlQuote: "¿Te suena?", thQuote: "Una frustración que la gente suele mencionar. Reacciona según lo cierto que te resulte.",
-      tlPromise: "La promesa", thPromise: "Lo que este producto afirma que hará por ti. Reacciona según lo atractivo que suene.",
-      tlFeature: "Función", thFeature: "Algo concreto que haría el producto. Reacciona según lo útil que te resultaría esta función.",
-      tlPrice: "Precio", thPrice: "Lo que costaría. Reacciona según si te parece que vale la pena a este precio.",
-      tlStatement: "Frase", thStatement: "Reacciona con tu sensación sincera — te encanta, te gusta o no es para ti."
+      tlHeadline: "La idea principal", thHeadline: "El título — el concepto central que se presenta. Reaccione según lo que le haga sentir la idea en sí.",
+      tlQuote: "¿Le suena?", thQuote: "Una frustración que la gente suele mencionar. Reaccione según lo cierto que le resulte.",
+      tlPromise: "La promesa", thPromise: "Lo que este producto afirma que hará por usted. Reaccione según lo atractivo que suene.",
+      tlFeature: "Función", thFeature: "Algo concreto que haría el producto. Reaccione según lo útil que le resultaría esta función.",
+      tlPrice: "Precio", thPrice: "Lo que costaría. Reaccione según si le parece que vale la pena a este precio.",
+      tlStatement: "Frase", thStatement: "Reaccione con su sensación sincera — le encanta, le gusta o no es para usted."
     },
     fr: {
       wTitle: "Bonjour ! 👋 Merci de votre aide.", wIntro: "Cela prend environ <strong>3 minutes</strong>. Voici comment ça marche :",
