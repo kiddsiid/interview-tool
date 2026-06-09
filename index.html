@@ -169,7 +169,7 @@
     background: var(--soft);
     align-items: start;
   }
-  .statement-row.has-reaction { background: var(--surface); border-color: #c9d3df; }
+  .statement-row.has-reaction { background: var(--surface); border-color: var(--border); }
   .statement-row .stmt {
     display: flex;
     flex-direction: column;
@@ -257,7 +257,7 @@
     font-size: 11px;
     padding: 1px 6px;
     border-radius: 8px;
-    background: #e9ecef;
+    background: var(--soft);
     color: var(--muted);
   }
   .slide-pill.active .progress { background: var(--slide-accent, #ccc); color: white; }
@@ -301,7 +301,7 @@
     vertical-align: middle;
   }
   table.heatmap thead th {
-    background: #f7f8fa;
+    background: var(--soft);
     color: var(--text);
     font-weight: 700;
     position: sticky;
@@ -348,9 +348,9 @@
     color: rgba(0,0,0,0.5);
     font-weight: 700;
   }
-  table.heatmap td.total-cell { font-weight: 700; background: #fafbfc; min-width: 60px; }
-  table.heatmap tr.totals-row td { font-weight: 700; background: #eef0f3; }
-  table.heatmap tr.totals-row td.label { background: #e0e3e8; }
+  table.heatmap td.total-cell { font-weight: 700; background: var(--soft); min-width: 60px; }
+  table.heatmap tr.totals-row td { font-weight: 700; background: var(--soft); }
+  table.heatmap tr.totals-row td.label { background: var(--border); }
 
   .legend {
     display: flex;
@@ -456,9 +456,9 @@
   .modal h3 { margin-top: 0; }
 
   /* ============ PARTICIPANT VIEW ============ */
-  body.participant-mode { background: #fafbfc; }
+  body.participant-mode { background: var(--bg); }
   .participant-shell {
-    max-width: 760px;
+    max-width: 860px;
     margin: 0 auto;
     padding: 20px 16px 80px;
   }
@@ -518,22 +518,38 @@
   }
   .pp-stmt {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px;
-    padding: 14px 16px;
-    margin-bottom: 10px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
     border-radius: 10px;
-    background: #fafbfc;
+    background: var(--soft);
     border: 1px solid var(--border);
-    flex-wrap: wrap;
   }
-  .pp-stmt.has-reaction { background: var(--surface); border-color: #b8c2cf; }
-  .pp-stmt-text { flex: 1; font-size: 16px; line-height: 1.45; min-width: 180px; }
+  .pp-stmt.has-reaction { background: var(--surface); border-color: var(--accent); }
+  .pp-stmt-head { display: flex; align-items: center; gap: 7px; }
+  .pp-stmt-label { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: var(--slide-accent, var(--accent)); }
+  .pp-stmt-text { font-size: 16px; line-height: 1.5; color: var(--text); overflow-wrap: anywhere; word-break: break-word; }
   .pp-stmt-text.is-headline { font-weight: 700; }
   .pp-stmt-text.is-quote    { font-style: italic; font-weight: 600; }
   .pp-stmt-text.is-promise  { font-style: italic; }
   .pp-stmt-text.is-price    { font-weight: 600; }
+  .pp-help {
+    flex: none; width: 18px; height: 18px; border-radius: 50%;
+    border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+    font-size: 11px; font-weight: 800; line-height: 1; cursor: pointer; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .pp-help:hover, .pp-help[aria-expanded="true"] { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pp-stmt-pop {
+    position: relative; margin: -4px 0 2px;
+    background: var(--panel); color: var(--text);
+    border: 1px solid var(--border); border-left: 3px solid var(--slide-accent, var(--accent));
+    border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.5;
+    box-shadow: var(--shadow);
+  }
+  .pp-stmt-pop[hidden] { display: none; }
   .pp-rxn { display: flex; gap: 6px; }
   .pp-rxn button {
     width: 50px;
@@ -583,7 +599,7 @@
   }
   .pp-done-screen h2 { margin: 0 0 10px; }
   .pp-done-screen .code-box {
-    background: #f6f7f9;
+    background: var(--soft);
     border: 1px solid var(--border);
     padding: 14px;
     border-radius: 10px;
@@ -954,6 +970,24 @@
 [data-theme="dark"] .btn { background: var(--surface); color: var(--text); }
 [data-theme="dark"] .btn.primary, [data-theme="dark"] .tab.active { color: #06210f; }
 [data-theme="dark"] input::placeholder, [data-theme="dark"] textarea::placeholder { color: #74837a; }
+
+/* ===== Midnight scheme (deep indigo) — overrides Green when data-scheme="midnight" ===== */
+[data-theme="dark"][data-scheme="midnight"] {
+  --bg: #0b1020; --panel: #131a2e; --surface: #131a2e; --text: #e6eaf5; --muted: #8b95b2;
+  --border: #283250; --soft: #161e36;
+  --accent: #6366f1; --accent-soft: #1e2547;
+  --brand-grad: linear-gradient(135deg, #818cf8 0%, #4f46e5 100%);
+  --hm-0: #161e36;
+}
+[data-theme="dark"][data-scheme="midnight"] .btn.primary,
+[data-theme="dark"][data-scheme="midnight"] .tab.active { color: #ffffff; }
+[data-theme="dark"][data-scheme="midnight"] input::placeholder,
+[data-theme="dark"][data-scheme="midnight"] textarea::placeholder { color: #6b7799; }
+
+/* scheme toggle only matters in dark mode, so reveal it there */
+.scheme-toggle { display: none; }
+[data-theme="dark"] .scheme-toggle { display: inline-flex; align-items: center; gap: 4px; }
+
 @media print { :root, [data-theme="dark"] { --surface: #ffffff; } }
 </style>
 </head>
@@ -977,6 +1011,7 @@
       <button class="btn tiny" id="rename-cycle">Rename</button>
       <button class="btn tiny danger" id="delete-cycle">Delete</button>
       <button class="btn tiny theme-toggle" id="theme-toggle" title="Toggle dark / light mode" aria-label="Toggle dark mode">🌙</button>
+      <button class="btn tiny scheme-toggle" id="scheme-toggle" title="Switch dark color scheme (Green / Midnight)" aria-label="Switch dark color scheme">🌿 Green</button>
     </div>
   </div>
 
@@ -1421,15 +1456,15 @@ function readLocalCache(uid) {
 (function injectCloudStyles() {
   const css =
     '#vit-auth-gate{position:fixed;inset:0;background:var(--bg,#f4f5f7);display:none;align-items:center;justify-content:center;padding:20px;z-index:1000;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}'
-  + '#vit-auth-card{background:#fff;border:1px solid var(--border,#e3e6ea);border-radius:14px;padding:30px 28px;max-width:380px;width:100%;box-shadow:0 10px 34px rgba(0,0,0,.10)}'
+  + '#vit-auth-card{background:var(--panel,#fff);border:1px solid var(--border,#e3e6ea);border-radius:14px;padding:30px 28px;max-width:380px;width:100%;box-shadow:0 10px 34px rgba(0,0,0,.10)}'
   + '#vit-auth-logo{font-size:17px;font-weight:700;color:var(--text,#1b1d22);margin-bottom:6px}'
   + '#vit-auth-sub{font-size:13px;line-height:1.5;color:var(--muted,#6b6f76);margin:0 0 18px}'
   + '#vit-auth-form{display:flex;flex-direction:column;gap:10px}'
-  + '#vit-auth-email,#vit-auth-password{padding:11px 12px;border:1px solid var(--border,#e3e6ea);border-radius:8px;font-size:14px;outline:none;font-family:inherit}'
+  + '#vit-auth-email,#vit-auth-password{padding:11px 12px;border:1px solid var(--border,#e3e6ea);border-radius:8px;font-size:14px;outline:none;font-family:inherit;background:var(--surface,#fff);color:var(--text,#1b1d22)}'
   + '#vit-auth-email:focus,#vit-auth-password:focus{border-color:var(--accent,#1a1a1a)}'
   + '#vit-auth-btn-row{display:flex;gap:8px;margin-top:2px}'
   + '#vit-auth-signin{flex:1;padding:11px 12px;border:none;border-radius:8px;background:var(--accent,#1a1a1a);color:#fff;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}'
-  + '#vit-auth-signup{flex:1;padding:11px 12px;border:1px solid var(--border,#e3e6ea);border-radius:8px;background:#fff;color:var(--text,#1b1d22);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}'
+  + '#vit-auth-signup{flex:1;padding:11px 12px;border:1px solid var(--border,#e3e6ea);border-radius:8px;background:var(--surface,#fff);color:var(--text,#1b1d22);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}'
   + '#vit-auth-signin:disabled,#vit-auth-signup:disabled{opacity:.6;cursor:default}'
   + '#vit-auth-signup:hover:not(:disabled){background:var(--soft,#f8f9fb)}'
   + '#vit-auth-reset{display:block;margin-top:10px;font-size:12px;color:var(--muted,#6b6f76);text-align:center;text-decoration:none;cursor:pointer;background:none;border:none;padding:0;font-family:inherit;width:100%}'
@@ -1437,7 +1472,8 @@ function readLocalCache(uid) {
   + '#vit-auth-msg{margin-top:14px;font-size:13px;line-height:1.5}'
   + '#vit-auth-msg.ok{color:#2e7d32}'
   + '#vit-auth-msg.err{color:#b71c1c}'
-  + '#vit-account{position:fixed;bottom:12px;right:14px;z-index:90;display:none;align-items:center;gap:7px;background:#fff;border:1px solid var(--border,#e3e6ea);border-radius:999px;padding:5px 7px 5px 11px;font-size:12px;box-shadow:0 2px 12px rgba(0,0,0,.10);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}'
+  + '#vit-account{position:fixed;bottom:calc(12px + env(safe-area-inset-bottom,0px));right:14px;z-index:90;display:none;align-items:center;gap:7px;background:var(--panel,#fff);border:1px solid var(--border,#e3e6ea);border-radius:999px;padding:5px 7px 5px 11px;font-size:12px;box-shadow:0 2px 12px rgba(0,0,0,.18);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}'
+  + '@media (max-width:560px){#vit-account{left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));justify-content:center}}'
   + '#vit-sync-dot{width:8px;height:8px;border-radius:50%;background:#9aa0a6;flex:none}'
   + '#vit-sync-text{color:var(--muted,#6b6f76)}'
   + '#vit-acct-sep{width:1px;height:14px;background:var(--border,#e3e6ea)}'
@@ -3792,7 +3828,14 @@ async function initParticipantMode() {
       afterSent: "Once you've sent it, you can close this page.", copyManual: "Or copy the code manually to paste somewhere",
       copyCode: "📋 Copy code", downloadFile: "⬇ Download as file", goBack: "← Go back to change a reaction",
       toastCopiedClip: "Code copied to clipboard", toastShareCancel: "Share cancelled", toastCopied: "Code copied", toastCopyFail: "Copy failed — select & copy manually",
-      lThanks: "Thanks! 🙌", lSaved: "Your reactions have been saved. You can hand the device back to the interviewer.", lBack: "← Back to slides"
+      lThanks: "Thanks! 🙌", lSaved: "Your reactions have been saved. You can hand the device back to the interviewer.", lBack: "← Back to slides",
+      whatIsThis: "What is this?",
+      tlHeadline: "The big idea", thHeadline: "The headline — the core concept being pitched. React to your gut feeling about the idea itself.",
+      tlQuote: "Sound familiar?", thQuote: "A frustration people often mention. React based on how true this feels for you.",
+      tlPromise: "The promise", thPromise: "What this product claims it will do for you. React to how appealing that sounds.",
+      tlFeature: "Feature", thFeature: "A specific thing the product would do. React to how useful this feature would be to you.",
+      tlPrice: "Price", thPrice: "What it would cost. React to whether it feels worth it at this price.",
+      tlStatement: "Statement", thStatement: "React with your honest gut feeling — love it, like it, or not for you."
     },
     es: {
       wTitle: "¡Hola! 👋 Gracias por ayudar.", wIntro: "Esto toma unos <strong>3 minutos</strong>. Así funciona:",
@@ -3808,7 +3851,14 @@ async function initParticipantMode() {
       afterSent: "Cuando lo hayas enviado, puedes cerrar esta página.", copyManual: "O copia el código manualmente para pegarlo en otro lugar",
       copyCode: "📋 Copiar código", downloadFile: "⬇ Descargar como archivo", goBack: "← Volver para cambiar una reacción",
       toastCopiedClip: "Código copiado al portapapeles", toastShareCancel: "Se canceló compartir", toastCopied: "Código copiado", toastCopyFail: "No se pudo copiar — selecciónalo y cópialo manualmente",
-      lThanks: "¡Gracias! 🙌", lSaved: "Tus reacciones se han guardado. Puedes devolver el dispositivo al entrevistador.", lBack: "← Volver a las frases"
+      lThanks: "¡Gracias! 🙌", lSaved: "Tus reacciones se han guardado. Puedes devolver el dispositivo al entrevistador.", lBack: "← Volver a las frases",
+      whatIsThis: "¿Qué es esto?",
+      tlHeadline: "La idea principal", thHeadline: "El título — el concepto central que se presenta. Reacciona según lo que te haga sentir la idea en sí.",
+      tlQuote: "¿Te suena?", thQuote: "Una frustración que la gente suele mencionar. Reacciona según lo cierto que te resulte.",
+      tlPromise: "La promesa", thPromise: "Lo que este producto afirma que hará por ti. Reacciona según lo atractivo que suene.",
+      tlFeature: "Función", thFeature: "Algo concreto que haría el producto. Reacciona según lo útil que te resultaría esta función.",
+      tlPrice: "Precio", thPrice: "Lo que costaría. Reacciona según si te parece que vale la pena a este precio.",
+      tlStatement: "Frase", thStatement: "Reacciona con tu sensación sincera — te encanta, te gusta o no es para ti."
     },
     fr: {
       wTitle: "Bonjour ! 👋 Merci de votre aide.", wIntro: "Cela prend environ <strong>3 minutes</strong>. Voici comment ça marche :",
@@ -3824,7 +3874,14 @@ async function initParticipantMode() {
       afterSent: "Une fois envoyé, vous pouvez fermer cette page.", copyManual: "Ou copiez le code manuellement pour le coller ailleurs",
       copyCode: "📋 Copier le code", downloadFile: "⬇ Télécharger en fichier", goBack: "← Revenir pour changer une réaction",
       toastCopiedClip: "Code copié dans le presse-papiers", toastShareCancel: "Partage annulé", toastCopied: "Code copié", toastCopyFail: "Échec de la copie — sélectionnez et copiez manuellement",
-      lThanks: "Merci ! 🙌", lSaved: "Vos réactions ont été enregistrées. Vous pouvez rendre l'appareil à l'intervieweur.", lBack: "← Revenir aux phrases"
+      lThanks: "Merci ! 🙌", lSaved: "Vos réactions ont été enregistrées. Vous pouvez rendre l'appareil à l'intervieweur.", lBack: "← Revenir aux phrases",
+      whatIsThis: "Qu'est-ce que c'est ?",
+      tlHeadline: "L'idée principale", thHeadline: "Le titre — le concept central présenté. Réagissez selon votre ressenti sur l'idée elle-même.",
+      tlQuote: "Ça vous parle ?", thQuote: "Une frustration souvent évoquée. Réagissez selon à quel point cela vous semble vrai.",
+      tlPromise: "La promesse", thPromise: "Ce que ce produit prétend faire pour vous. Réagissez selon à quel point cela semble attrayant.",
+      tlFeature: "Fonction", thFeature: "Une chose précise que ferait le produit. Réagissez selon l'utilité de cette fonction pour vous.",
+      tlPrice: "Prix", thPrice: "Ce que cela coûterait. Réagissez selon si cela vous semble en valoir la peine à ce prix.",
+      tlStatement: "Phrase", thStatement: "Réagissez selon votre ressenti sincère — j'adore, j'aime ou ce n'est pas pour moi."
     }
   };
   const PT = PT_ALL[ppLang] || PT_ALL.en;
@@ -3899,12 +3956,13 @@ async function initParticipantMode() {
     <div class="pp-slide" style="--slide-accent:${slide.color}">
       <h2>${escapeHtml(slide.headline)}</h2>`;
 
-    html += renderPpStmt({ id: slide.id + '|headline', text: slide.headline, type: 'headline' });
+    html += renderPpStmt({ id: slide.id + '|headline', text: slide.headline, type: 'headline' }, 0);
     let fIdx = 0;
     for (const st of slide.statements) {
       // Skip empty statements (allows interviewer to leave gaps without spam)
       if (!st.text || !st.text.trim()) continue;
-      html += renderPpStmt(st);
+      if (st.type === 'feature') fIdx++;
+      html += renderPpStmt(st, st.type === 'feature' ? fIdx : 0);
     }
     html += `</div>
     <div class="pp-nav">
@@ -3912,6 +3970,18 @@ async function initParticipantMode() {
       <button class="primary" id="pp-next">${idx === slides.length - 1 ? PT.doneNav : PT.next}</button>
     </div>`;
     root.innerHTML = html;
+
+    root.querySelectorAll('.pp-help').forEach(btn => {
+      btn.addEventListener('click', e => {
+        e.stopPropagation();
+        const pop = document.getElementById(btn.dataset.pop);
+        if (!pop) return;
+        const willOpen = pop.hasAttribute('hidden');
+        root.querySelectorAll('.pp-stmt-pop').forEach(p => p.setAttribute('hidden', ''));
+        root.querySelectorAll('.pp-help').forEach(b => b.setAttribute('aria-expanded', 'false'));
+        if (willOpen) { pop.removeAttribute('hidden'); btn.setAttribute('aria-expanded', 'true'); }
+      });
+    });
 
     root.querySelectorAll('.pp-rxn button').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -3931,10 +4001,28 @@ async function initParticipantMode() {
     document.getElementById('pp-next').addEventListener('click', () => { ppState.currentIdx++; ppSave(); render(); window.scrollTo({top:0}); });
   }
 
-  function renderPpStmt(st) {
+  function ppStmtInfo(type, featNum) {
+    switch (type) {
+      case 'headline': return { label: PT.tlHeadline, help: PT.thHeadline };
+      case 'quote':    return { label: PT.tlQuote,    help: PT.thQuote };
+      case 'promise':  return { label: PT.tlPromise,  help: PT.thPromise };
+      case 'feature':  return { label: featNum ? (PT.tlFeature + ' ' + featNum) : PT.tlFeature, help: PT.thFeature };
+      case 'price':    return { label: PT.tlPrice,    help: PT.thPrice };
+      default:         return { label: PT.tlStatement, help: PT.thStatement };
+    }
+  }
+
+  function renderPpStmt(st, featNum) {
     const r = ppState.reactions[st.id] || null;
     const cls = 'is-' + st.type;
+    const info = ppStmtInfo(st.type, featNum);
+    const popId = 'pop-' + String(st.id).replace(/[^a-zA-Z0-9_-]/g, '');
     return `<div class="pp-stmt ${r ? 'has-reaction' : ''}">
+      <div class="pp-stmt-head">
+        <span class="pp-stmt-label">${escapeHtml(info.label)}</span>
+        <button class="pp-help" type="button" aria-expanded="false" aria-controls="${popId}" data-pop="${popId}" title="${escapeHtml(PT.whatIsThis)}" aria-label="${escapeHtml(PT.whatIsThis)}">?</button>
+      </div>
+      <div class="pp-stmt-pop" id="${popId}" role="note" hidden>${escapeHtml(info.help)}</div>
       <div class="pp-stmt-text ${cls}">${escapeHtml(st.text)}</div>
       <div class="pp-rxn">
         <button class="love ${r === 'love' ? 'active' : ''}" data-st-key="${st.id}" data-rxn="love" aria-label="super positive">❤️</button>
@@ -4064,22 +4152,47 @@ function showToast(msg) {
 <script>
 /* ---- light / dark (green) theme toggle ---- */
 (function () {
+  function curScheme() { return document.documentElement.getAttribute('data-scheme') === 'midnight' ? 'midnight' : 'green'; }
+  function updateThemeColor() {
+    var m = document.querySelector('meta[name="theme-color"]'); if (!m) return;
+    var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (!dark) { m.setAttribute('content', '#4f46e5'); return; }
+    m.setAttribute('content', curScheme() === 'midnight' ? '#0b1020' : '#0f1411');
+  }
+  function applyScheme(s) {
+    s = (s === 'midnight') ? 'midnight' : 'green';
+    document.documentElement.setAttribute('data-scheme', s);
+    var sb = document.getElementById('scheme-toggle');
+    if (sb) {
+      sb.textContent = (s === 'midnight') ? '\ud83c\udf0c Midnight' : '\ud83c\udf3f Green';
+      sb.title = 'Dark color scheme: ' + (s === 'midnight' ? 'Midnight (tap for Green)' : 'Green (tap for Midnight)');
+    }
+    updateThemeColor();
+    try { localStorage.setItem('reactioner-scheme', s); } catch (e) {}
+  }
   function apply(t) {
     t = (t === 'dark') ? 'dark' : 'light';
     document.documentElement.setAttribute('data-theme', t);
     var b = document.getElementById('theme-toggle'); if (b) b.textContent = (t === 'dark') ? '\u2600\ufe0f' : '\ud83c\udf19';
-    var m = document.querySelector('meta[name="theme-color"]'); if (m) m.setAttribute('content', (t === 'dark') ? '#0f1411' : '#4f46e5');
+    updateThemeColor();
     try { localStorage.setItem('reactioner-theme', t); } catch (e) {}
   }
   function cur() { return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light'; }
+  function initScheme() {
+    var s = null; try { s = localStorage.getItem('reactioner-scheme'); } catch (e) {}
+    applyScheme(s || 'green');
+  }
   function init() {
     var t = null; try { t = localStorage.getItem('reactioner-theme'); } catch (e) {}
     if (!t) t = (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
     apply(t);
   }
-  function wire() { var b = document.getElementById('theme-toggle'); if (b && !b._wired) { b._wired = 1; b.addEventListener('click', function () { apply(cur() === 'dark' ? 'light' : 'dark'); }); } }
-  init(); wire();
-  document.addEventListener('DOMContentLoaded', function () { init(); wire(); });
+  function wire() {
+    var b = document.getElementById('theme-toggle'); if (b && !b._wired) { b._wired = 1; b.addEventListener('click', function () { apply(cur() === 'dark' ? 'light' : 'dark'); }); }
+    var sb = document.getElementById('scheme-toggle'); if (sb && !sb._wired) { sb._wired = 1; sb.addEventListener('click', function () { applyScheme(curScheme() === 'midnight' ? 'green' : 'midnight'); }); }
+  }
+  initScheme(); init(); wire();
+  document.addEventListener('DOMContentLoaded', function () { initScheme(); init(); wire(); });
 })();
 </script>
 </body>
