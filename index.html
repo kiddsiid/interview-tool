@@ -635,7 +635,7 @@
     body { background: white !important; }
     .container { max-width: 100% !important; padding: 12mm 10mm !important; }
     .topbar, .tabs, .modal-back, .toast,
-    #view-interview, #view-share, #view-edit, #view-participants, #view-settings,
+    #view-interview, #view-share, #view-edit, #view-participants, #view-settings, #view-vp,
     #participant-ui, .heatmap-controls, #vit-account { display: none !important; }
     #view-heatmap { display: block !important; }
     #view-heatmap .panel { box-shadow: none !important; padding: 0 !important; margin: 0 !important; background: white !important; }
@@ -998,6 +998,56 @@
 [data-theme="dark"] .scheme-toggle { display: inline-flex; align-items: center; gap: 4px; }
 
 @media print { :root, [data-theme="dark"] { --surface: #ffffff; } }
+
+/* ===== Value-Proposition Discovery Engine ===== */
+.vp-subnav { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 16px; }
+.vp-subnav button { padding:7px 14px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--muted); font-weight:600; font-size:13px; cursor:pointer; }
+.vp-subnav button.active { background:var(--accent-soft); color:var(--accent-text); border-color:var(--accent); }
+.vp-intro { color:var(--text); font-size:13.5px; line-height:1.55; margin:0 0 16px; }
+.vp-version-bar { display:flex; align-items:center; gap:10px; flex-wrap:wrap; background:var(--soft); border:1px solid var(--border); border-radius:10px; padding:10px 14px; margin-bottom:16px; color:var(--text); }
+.vp-version-bar .vlabel { font-weight:800; color:var(--text); }
+.vp-pill { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; padding:2px 9px; border-radius:999px; }
+.vp-pill.draft { background:var(--accent-soft); color:var(--accent-text); }
+.vp-pill.frozen { background:#3a2f12; color:#f1c14b; }
+[data-theme="dark"][data-scheme="midnight"] .vp-pill.frozen { background:#2b2440; color:#cbb4ff; }
+.vp-kind-group { margin-bottom:22px; }
+.vp-kind-head { font-size:12px; font-weight:800; text-transform:uppercase; letter-spacing:0.6px; color:var(--muted); margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+.vp-comp { background:var(--soft); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:10px; }
+.vp-comp.disconfirmed { border-color:var(--dis-c); }
+.vp-comp-top { display:flex; align-items:flex-start; gap:12px; justify-content:space-between; }
+.vp-comp-text { flex:1; min-width:0; color:var(--text); font-size:15px; line-height:1.5; }
+.vp-comp-text[contenteditable="true"]:focus { outline:2px solid var(--accent); border-radius:6px; }
+.vp-conf { flex:none; text-align:right; }
+.vp-conf .badge { font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.4px; padding:3px 9px; border-radius:999px; display:inline-block; }
+.vp-conf .badge.untested { background:var(--border); color:var(--text); }
+.vp-conf .badge.weak { background:var(--hm--1); color:#7a1f1f; }
+.vp-conf .badge.moderate { background:#fde68a; color:#7a4f0a; }
+.vp-conf .badge.strong { background:var(--hm-1); color:#0d3b1e; }
+.vp-conf .badge.invalidated { background:var(--dis-bg); color:var(--dis-c); }
+.vp-conf .score { font-size:11px; color:var(--muted); margin-top:3px; }
+.vp-why { font-size:12px; color:var(--muted); margin-top:8px; line-height:1.45; }
+.vp-ev { margin-top:10px; display:flex; flex-direction:column; gap:6px; }
+.vp-ev-item { font-size:12.5px; line-height:1.45; padding:7px 10px; border-radius:8px; border-left:3px solid var(--border); background:var(--surface); color:var(--text); }
+.vp-ev-item.supporting { border-left-color:var(--like-c); }
+.vp-ev-item.contradicting { border-left-color:var(--dis-c); background:var(--dis-bg); color:#7a1f1f; }
+.vp-ev-item .ev-tag { font-weight:800; font-size:10px; text-transform:uppercase; letter-spacing:0.4px; margin-right:6px; }
+.vp-ev-item.supporting .ev-tag { color:var(--like-c); }
+.vp-ev-item.contradicting .ev-tag { color:var(--dis-c); }
+.vp-comp-actions { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+.vp-diff { background:var(--soft); border:1px solid var(--border); border-radius:12px; padding:14px 16px; margin-bottom:10px; }
+.vp-diff.disconfirming { border-color:var(--dis-c); }
+.vp-diff .from { color:var(--dis-c); text-decoration:line-through; opacity:0.8; }
+.vp-diff .to { color:var(--like-c); font-weight:600; }
+.vp-diff .reason { font-size:12.5px; color:var(--text); margin:8px 0; line-height:1.5; }
+.vp-drift { background:var(--soft); border:1px solid var(--accent); border-radius:12px; padding:14px 16px; margin-bottom:10px; }
+.vp-drift .row { display:flex; gap:10px; font-size:13px; margin:4px 0; color:var(--text); }
+.vp-drift .row .lab { flex:none; width:64px; color:var(--muted); font-weight:700; font-size:11px; text-transform:uppercase; }
+.vp-evo-item { border-left:2px solid var(--accent); padding:0 0 16px 16px; margin-left:6px; position:relative; }
+.vp-evo-item .dot { position:absolute; left:-6px; top:2px; width:10px; height:10px; border-radius:50%; background:var(--accent); }
+.vp-evo-item h4 { margin:0 0 4px; color:var(--text); font-size:14px; }
+.vp-ai-box { background:var(--soft); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+.vp-empty { color:var(--muted); font-size:13px; font-style:italic; padding:8px 0; }
+.vp-comp textarea, .vp-ai-box input, .vp-ai-box textarea { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-family:inherit; font-size:13px; }
 </style>
 </head>
 <body>
@@ -1030,6 +1080,7 @@
     <button class="tab" data-view="share">🔗 Share</button>
     <button class="tab" data-view="edit">✏️ Slides</button>
     <button class="tab" data-view="participants">👥 People</button>
+    <button class="tab" data-view="vp">💎 Value Prop</button>
     <button class="tab" data-view="settings">⚙️ Settings</button>
   </div>
 
@@ -1988,17 +2039,17 @@ const participantNameInput = document.getElementById('participant-name-input');
 function colorForScore(score) {
   if (score === null || score === undefined) return { bg: 'var(--hm-0)', fg: 'var(--text)' };
   if (score >= 3)  return { bg: 'var(--hm-3)', fg: 'white' };
-  if (score >= 2)  return { bg: 'var(--hm-2)', fg: 'white' };
-  if (score >= 1)  return { bg: 'var(--hm-1)', fg: 'var(--text)' };
+  if (score >= 2)  return { bg: 'var(--hm-2)', fg: '#0d3b1e' };
+  if (score >= 1)  return { bg: 'var(--hm-1)', fg: '#0d3b1e' };
   if (score === 0) return { bg: 'var(--hm-0)', fg: 'var(--text)' };
-  if (score >= -1) return { bg: 'var(--hm--1)', fg: 'var(--text)' };
+  if (score >= -1) return { bg: 'var(--hm--1)', fg: '#7a1f1f' };
   if (score >= -2) return { bg: 'var(--hm--2)', fg: 'white' };
   return { bg: 'var(--hm--3)', fg: 'white' };
 }
 function reactionToScore(rxn) { return rxn ? (state.scoreMap[rxn] || 0) : 0; }
 function reactionEmoji(rxn) { return rxn === 'love' ? '❤️' : rxn === 'like' ? '👍' : rxn === 'dislike' ? '👎' : ''; }
 
-const views = ['interview', 'heatmap', 'share', 'edit', 'participants', 'settings'];
+const views = ['interview', 'heatmap', 'share', 'edit', 'participants', 'vp', 'settings'];
 function setView(v) {
   state.activeView = v; save();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
@@ -2011,6 +2062,7 @@ function setView(v) {
   if (v === 'share') renderShare();
   if (v === 'edit') renderEditSlides();
   if (v === 'participants') renderParticipants();
+  if (v === 'vp') { if (typeof renderVP === 'function') renderVP(); }
   if (v === 'settings') renderExportPreview();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setView(t.dataset.view)));
@@ -4202,6 +4254,439 @@ function showToast(msg) {
   }
   initScheme(); init(); wire();
   document.addEventListener('DOMContentLoaded', function () { initScheme(); init(); wire(); });
+})();
+</script>
+<script>
+/* ============================================================
+   VALUE-PROPOSITION DISCOVERY ENGINE  (additive module)
+   Reuses global: state, activeCycle, defaultCycle, uid, rkey,
+   reactionToScore, save, showToast, escapeHtml, renderCycleSelect
+   ============================================================ */
+(function () {
+  function nowISO() { return new Date().toISOString(); }
+  function vid(p) { return (p || 'id') + '_' + Math.random().toString(36).slice(2, 9); }
+  function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(s) : String(s == null ? '' : s); }
+  function norm(s) { return String(s == null ? '' : s).trim().replace(/\s+/g, ' ').toLowerCase(); }
+  function rScore(rxn) { return (typeof reactionToScore === 'function') ? reactionToScore(rxn) : ({ love: 3, like: 1, dislike: -1 }[rxn] || 0); }
+
+  var KIND_LABEL = { jtbd: 'Job to be done', pain: 'Pain', gain: 'Gain', promise: 'Promise', feature: 'Feature', price: 'Price' };
+  var KIND_ORDER = ['jtbd', 'pain', 'gain', 'promise', 'feature', 'price'];
+  var TYPE_TO_KIND = { headline: 'promise', promise: 'promise', quote: 'pain', feature: 'feature', price: 'price', custom: 'gain' };
+
+  var vpSub = 'components';
+  var _driftCache = [];
+
+  /* ---------- ensure / migrate ---------- */
+  function ensureVP() {
+    if (!state.aiSettings) state.aiSettings = { apiKey: '', model: 'claude-haiku-4-5-20251001' };
+    if (!state.evidence) state.evidence = {};
+    if (!state.valueProp || !state.valueProp.versions || !state.valueProp.versions.length) buildInitialVP();
+    if (!state.valueProp.proposedEdits) state.valueProp.proposedEdits = [];
+    if (state.schemaVersion == null || state.schemaVersion < 3) state.schemaVersion = 3;
+    bindCycles();
+    freezeCollecting();
+    save();
+  }
+  function buildInitialVP() {
+    var v1 = { id: vid('vpv'), label: 'v1', createdAt: nowISO(), parentVersionId: null, status: 'draft', frozenAt: null, components: {}, changelog: [] };
+    var c = (typeof activeCycle === 'function') ? activeCycle() : (state.cycles && state.cycles[0]);
+    var counters = {};
+    function add(kind, text, slideRef) {
+      counters[kind] = (counters[kind] || 0) + 1;
+      var key = kind + '-' + counters[kind];
+      v1.components[key] = { componentKey: key, kind: kind, text: text || '', confidence: 'untested', confidenceScore: 0, evidenceIds: [], slideRef: slideRef || null, pinned: false };
+    }
+    if (c && Array.isArray(c.slides)) {
+      c.slides.forEach(function (slide) {
+        if (slide.headline && slide.headline.trim()) add('promise', slide.headline.trim(), { slideId: slide.id, statementId: 'headline' });
+        (slide.statements || []).forEach(function (st) {
+          if (!st.text || !st.text.trim()) return;
+          add(TYPE_TO_KIND[st.type] || 'gain', st.text.trim(), { slideId: slide.id, statementId: st.id });
+        });
+      });
+    }
+    if (!Object.keys(v1.components).some(function (k) { return v1.components[k].kind === 'jtbd'; })) add('jtbd', '');
+    state.valueProp = { versions: [v1], activeVersionId: v1.id, proposedEdits: [] };
+  }
+  function activeVersion() { var vp = state.valueProp; return vp.versions.filter(function (v) { return v.id === vp.activeVersionId; })[0] || vp.versions[vp.versions.length - 1]; }
+  function versionById(id) { return state.valueProp.versions.filter(function (v) { return v.id === id; })[0]; }
+  function bindCycles() {
+    var vid0 = state.valueProp.activeVersionId;
+    (state.cycles || []).forEach(function (c) { if (!c.vpVersionId) { c.vpVersionId = vid0; c.boundAt = nowISO(); } if (!c.interviews) c.interviews = []; });
+  }
+  function cycleHasReactions(c) { return c.reactions && Object.keys(c.reactions).some(function (k) { return c.reactions[k] && c.reactions[k].reaction; }); }
+  function freezeCollecting() {
+    (state.cycles || []).forEach(function (c) {
+      if (cycleHasReactions(c) && c.vpVersionId) {
+        var v = versionById(c.vpVersionId);
+        if (v && v.status === 'draft') { v.status = 'frozen'; v.frozenAt = nowISO(); }
+        if (!c.startedCollectingAt) c.startedCollectingAt = nowISO();
+        if (!c.slideSnapshot) { try { c.slideSnapshot = JSON.parse(JSON.stringify(c.slides || [])); } catch (e) {} }
+      }
+    });
+  }
+
+  /* ---------- evidence + confidence ---------- */
+  function componentEvidence(key, versionId) {
+    return Object.keys(state.evidence).map(function (id) { return state.evidence[id]; })
+      .filter(function (e) { return e && e.componentKey === key && (!versionId || e.vpVersionId === versionId); });
+  }
+  function gatherReactionScores(comp, version) {
+    if (!comp.slideRef) return [];
+    var out = [];
+    (state.cycles || []).forEach(function (c) {
+      if (c.vpVersionId !== version.id) return;
+      (c.participants || []).forEach(function (p) {
+        var r = c.reactions[rkey(p.id, comp.slideRef.slideId, comp.slideRef.statementId)];
+        if (r && r.reaction) out.push(rScore(r.reaction));
+      });
+    });
+    return out;
+  }
+  function computeConfidence(comp, version) {
+    var scores = gatherReactionScores(comp, version);
+    var ev = componentEvidence(comp.componentKey, version.id);
+    var S = ev.filter(function (e) { return e.polarity === 'supporting'; }).length;
+    var C = ev.filter(function (e) { return e.polarity === 'contradicting'; }).length;
+    var n = scores.length;
+    if (n === 0 && S === 0 && C === 0) return { level: 'untested', score: 0, n: n, S: S, C: C, why: 'No reactions or transcript evidence yet.' };
+    var mean = n ? scores.reduce(function (a, b) { return a + b; }, 0) / n : 0;
+    var rc = n ? (((mean + 1) / 4) * 70 - 25) : 0;
+    rc *= Math.min(1, n / 3 + 0.34);
+    var td = (S * 14) - (C * 18);
+    var volume = Math.min(n + S + C, 8) * 1.5;
+    var score = 45 + rc + td + volume;
+    var disconfirmed = (C >= 2 && C > S) || (C >= 1 && C >= S && mean < 0);
+    var level;
+    if (disconfirmed) { level = 'invalidated'; score = Math.min(score, 24); }
+    else { score = Math.max(6, Math.min(96, score)); level = score >= 72 ? 'strong' : score >= 46 ? 'moderate' : 'weak'; }
+    score = Math.max(2, Math.min(96, Math.round(score)));
+    comp.confidence = level; comp.confidenceScore = score;
+    var bits = [];
+    if (n) bits.push(n + ' reaction' + (n > 1 ? 's' : '') + ' (avg ' + mean.toFixed(1) + ')');
+    if (S) bits.push(S + ' supporting quote' + (S > 1 ? 's' : ''));
+    if (C) bits.push(C + ' contradicting quote' + (C > 1 ? 's' : ''));
+    return { level: level, score: score, n: n, S: S, C: C, why: bits.join(' · ') + (disconfirmed ? ' — disconfirming evidence dominates' : '') };
+  }
+
+  /* ---------- transcript analysis (Claude, BYO key) ---------- */
+  function parseJSONLoose(s) {
+    if (!s) return null;
+    var t = String(s).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
+    var a = t.indexOf('{'), b = t.lastIndexOf('}');
+    if (a >= 0 && b > a) t = t.slice(a, b + 1);
+    try { return JSON.parse(t); } catch (e) { return null; }
+  }
+  function callClaudeVP(prompt) {
+    var apiKey = state.aiSettings && state.aiSettings.apiKey;
+    var model = (state.aiSettings && state.aiSettings.model) || 'claude-haiku-4-5-20251001';
+    if (!apiKey) return Promise.reject(new Error('No API key set'));
+    return fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true', 'content-type': 'application/json' },
+      body: JSON.stringify({ model: model, max_tokens: 2048, messages: [{ role: 'user', content: prompt }] })
+    }).then(function (res) {
+      if (!res.ok) return res.json().catch(function () { return {}; }).then(function (j) { throw new Error('HTTP ' + res.status + (j.error && j.error.message ? ' — ' + j.error.message : '')); });
+      return res.json();
+    }).then(function (data) { return (data.content && data.content[0] && data.content[0].text) || ''; });
+  }
+  function buildAnalysisPrompt(version, transcript) {
+    var comps = Object.keys(version.components).map(function (k) { var c = version.components[k]; return '- [' + c.componentKey + '] (' + KIND_LABEL[c.kind] + '): ' + (c.text || '(empty)'); }).join('\n');
+    return 'You are a rigorous customer-discovery analyst (The Mom Test, Lean Startup, Traction). Real pain shows up as specific PAST behaviour and active workarounds; compliments and hypotheticals do not count; DISCONFIRMING evidence matters more than flattering evidence.\n\n'
+      + "Here is the founder's current value proposition, broken into components (each has a stable id):\n" + comps + '\n\n'
+      + 'Read this interview transcript and map what the interviewee ACTUALLY said back to these components.\n\nTRANSCRIPT:\n"""\n' + transcript + '\n"""\n\n'
+      + 'Return ONLY valid JSON (no prose, no markdown fences) with this exact shape:\n'
+      + '{"summary":"one or two sentences on the most important finding","evidence":[{"componentKey":"pain-1","polarity":"supporting|contradicting|neutral","quote":"verbatim words from the transcript","weight":0.8,"reasoning":"why this bears on that component"}],"proposedEdits":[{"componentKey":"pain-1","type":"reword|add|remove","toText":"suggested new wording","reason":"evidence-based reason","disconfirming":true}]}\n'
+      + 'Only include an evidence item if the transcript genuinely speaks to that component. Prefer verbatim quotes. Surface contradicting evidence. Propose a reword when a claim is contradicted or described differently than written.';
+  }
+  function runAnalysis(cycle, interview) {
+    var version = activeVersion();
+    return callClaudeVP(buildAnalysisPrompt(version, interview.transcript.raw)).then(function (raw) {
+      var parsed = parseJSONLoose(raw);
+      if (!parsed) throw new Error('Could not parse the analysis response');
+      (parsed.evidence || []).forEach(function (e) {
+        if (!version.components[e.componentKey]) return;
+        var id = vid('ev');
+        state.evidence[id] = { id: id, componentKey: e.componentKey, polarity: (e.polarity === 'supporting' || e.polarity === 'contradicting') ? e.polarity : 'neutral', sourceType: 'transcript', vpVersionId: version.id, cycleId: cycle.id, interviewId: interview.id, quote: String(e.quote || ''), reactionScore: null, weight: (typeof e.weight === 'number' ? e.weight : 1), reasoning: String(e.reasoning || ''), createdAt: nowISO() };
+        version.components[e.componentKey].evidenceIds.push(id);
+      });
+      (parsed.proposedEdits || []).forEach(function (p) {
+        if (!version.components[p.componentKey] && p.type !== 'add') return;
+        var fromText = version.components[p.componentKey] ? version.components[p.componentKey].text : '';
+        state.valueProp.proposedEdits.push({ id: vid('pe'), componentKey: p.componentKey, type: (p.type || 'reword'), fromText: fromText, toText: String(p.toText || ''), reason: String(p.reason || ''), evidenceIds: [], disconfirming: !!p.disconfirming, status: 'pending', createdAt: nowISO(), versionId: version.id });
+      });
+      if (!interview.transcript.analysis) interview.transcript.analysis = {};
+      interview.transcript.analysis = { summary: String(parsed.summary || ''), ranAt: nowISO(), model: state.aiSettings.model };
+      save();
+      return parsed;
+    });
+  }
+
+  /* ---------- proposed edits + versioning ---------- */
+  function pendingEdits() { return (state.valueProp.proposedEdits || []).filter(function (p) { return p.status === 'pending'; }); }
+  function acceptedEdits() { return (state.valueProp.proposedEdits || []).filter(function (p) { return p.status === 'accepted'; }); }
+  function decideEdit(id, decision) { var p = (state.valueProp.proposedEdits || []).filter(function (x) { return x.id === id; })[0]; if (p) { p.status = decision; p.decidedAt = nowISO(); save(); renderVP(); } }
+  function forkVersion() {
+    var cur = activeVersion();
+    var accepted = acceptedEdits().filter(function (p) { return p.versionId === cur.id; });
+    if (!accepted.length && !confirm('No accepted changes for this version yet. Create an identical new version anyway?')) return;
+    var nv = { id: vid('vpv'), label: 'v' + (state.valueProp.versions.length + 1), createdAt: nowISO(), parentVersionId: cur.id, status: 'draft', frozenAt: null, components: JSON.parse(JSON.stringify(cur.components)), changelog: [] };
+    Object.keys(nv.components).forEach(function (k) { nv.components[k].evidenceIds = []; nv.components[k].confidence = 'untested'; nv.components[k].confidenceScore = 0; });
+    accepted.forEach(function (p) {
+      if (p.type === 'reword' && nv.components[p.componentKey]) {
+        var from = nv.components[p.componentKey].text; nv.components[p.componentKey].text = p.toText;
+        nv.changelog.push({ componentKey: p.componentKey, type: 'reword', from: from, to: p.toText, reason: p.reason, at: nowISO(), fromProposedEditId: p.id });
+      } else if (p.type === 'add') {
+        var kind = (cur.components[p.componentKey] && cur.components[p.componentKey].kind) || 'gain';
+        var key = (p.componentKey && !nv.components[p.componentKey]) ? p.componentKey : (kind + '-' + vid('c'));
+        nv.components[key] = { componentKey: key, kind: kind, text: p.toText, confidence: 'untested', confidenceScore: 0, evidenceIds: [], slideRef: null, pinned: false };
+        nv.changelog.push({ componentKey: key, type: 'add', from: '', to: p.toText, reason: p.reason, at: nowISO(), fromProposedEditId: p.id });
+      } else if (p.type === 'remove' && nv.components[p.componentKey]) {
+        var f2 = nv.components[p.componentKey].text; delete nv.components[p.componentKey];
+        nv.changelog.push({ componentKey: p.componentKey, type: 'remove', from: f2, to: '', reason: p.reason, at: nowISO(), fromProposedEditId: p.id });
+      }
+      p.status = 'applied';
+    });
+    cur.status = 'archived';
+    state.valueProp.versions.push(nv);
+    state.valueProp.activeVersionId = nv.id;
+    // carry the founder's existing slides forward into a fresh cycle bound to the new version
+    var srcCycle = activeCycle();
+    var nc = defaultCycle(nv.label + ' interviews');
+    nc.vpVersionId = nv.id; nc.boundAt = nowISO(); nc.interviews = [];
+    try { nc.slides = srcCycle && srcCycle.slides ? JSON.parse(JSON.stringify(srcCycle.slides)) : []; } catch (e) { nc.slides = []; }
+    nc.activeSlideId = nc.slides[0] ? nc.slides[0].id : null;
+    nc.activeParticipantId = nc.participants[0] ? nc.participants[0].id : null;
+    state.cycles.push(nc); state.activeCycleId = nc.id;
+    save();
+    if (typeof renderCycleSelect === 'function') renderCycleSelect();
+    showToast('Forked ' + nv.label + ' from ' + cur.label);
+    vpSub = 'components'; renderVP();
+  }
+  function retestVersion() {
+    var cur = activeVersion();
+    var nc = defaultCycle('Re-test ' + cur.label);
+    nc.vpVersionId = cur.id; nc.boundAt = nowISO(); nc.interviews = [];
+    var src = (state.cycles || []).filter(function (x) { return x.vpVersionId === cur.id && x.slides && x.slides.length; })[0];
+    try { nc.slides = src ? JSON.parse(JSON.stringify(src.slides)) : []; } catch (e) { nc.slides = []; }
+    nc.activeSlideId = nc.slides[0] ? nc.slides[0].id : null;
+    nc.activeParticipantId = nc.participants[0] ? nc.participants[0].id : null;
+    state.cycles.push(nc); state.activeCycleId = nc.id;
+    save();
+    if (typeof renderCycleSelect === 'function') renderCycleSelect();
+    showToast('New cycle bound to ' + cur.label);
+    vpSub = 'components'; renderVP();
+  }
+
+  /* ---------- drift ---------- */
+  function driftFlags(version) {
+    var flags = [];
+    Object.keys(version.components).forEach(function (k) {
+      var comp = version.components[k];
+      if (!comp.slideRef) { if (['promise', 'pain', 'feature', 'price'].indexOf(comp.kind) >= 0 && comp.text) flags.push({ kind: 'missing-slide', comp: comp }); return; }
+      var slideText = null, found = false;
+      (state.cycles || []).forEach(function (c) {
+        if (c.vpVersionId !== version.id) return;
+        (c.slides || []).forEach(function (s) {
+          if (s.id !== comp.slideRef.slideId) return;
+          if (comp.slideRef.statementId === 'headline') { slideText = s.headline; found = true; }
+          else { var st = (s.statements || []).filter(function (x) { return x.id === comp.slideRef.statementId; })[0]; if (st) { slideText = st.text; found = true; } }
+        });
+      });
+      if (found && norm(slideText) !== norm(comp.text)) flags.push({ kind: 'wording', comp: comp, slideText: slideText });
+    });
+    return flags;
+  }
+  function driftUpdateSlide(comp) {
+    var v = activeVersion();
+    (state.cycles || []).forEach(function (c) {
+      if (c.vpVersionId !== v.id) return;
+      (c.slides || []).forEach(function (s) {
+        if (s.id !== comp.slideRef.slideId) return;
+        if (comp.slideRef.statementId === 'headline') s.headline = comp.text;
+        else { var st = (s.statements || []).filter(function (x) { return x.id === comp.slideRef.statementId; })[0]; if (st) st.text = comp.text; }
+      });
+    });
+    save(); showToast('Slide updated to match the value proposition'); renderVP();
+  }
+  function driftUpdateVP(comp, slideText) {
+    var v = activeVersion();
+    if (v.status === 'frozen' || v.status === 'archived') {
+      state.valueProp.proposedEdits.push({ id: vid('pe'), componentKey: comp.componentKey, type: 'reword', fromText: comp.text, toText: slideText, reason: 'Align the value proposition with the current slide wording (drift).', evidenceIds: [], disconfirming: false, status: 'pending', createdAt: nowISO(), versionId: v.id });
+      save(); showToast('Staged as a proposed change (this version is frozen)'); vpSub = 'transcripts'; renderVP();
+    } else { comp.text = slideText; save(); renderVP(); }
+  }
+
+  /* ---------- rendering ---------- */
+  function versionBar(v) {
+    var vp = state.valueProp;
+    var opts = vp.versions.map(function (x) { return '<option value="' + x.id + '"' + (x.id === vp.activeVersionId ? ' selected' : '') + '>' + esc(x.label) + (x.status === 'frozen' ? ' (frozen)' : x.status === 'archived' ? ' (archived)' : '') + '</option>'; }).join('');
+    return '<div class="vp-version-bar"><span class="vlabel">' + esc(v.label) + '</span><span class="vp-pill ' + v.status + '">' + v.status + '</span>'
+      + '<span style="color:var(--muted);font-size:12px">Viewing:</span><select id="vp-version-select">' + opts + '</select>'
+      + '<span style="flex:1"></span><button class="btn tiny" data-vpnav="evolution">History</button></div>';
+  }
+  function evItem(e) {
+    var tag = e.polarity === 'contradicting' ? 'Contradicts' : (e.polarity === 'supporting' ? 'Supports' : 'Neutral');
+    return '<div class="vp-ev-item ' + e.polarity + '"><span class="ev-tag">' + tag + '</span>' + (e.quote ? ('“' + esc(e.quote) + '”') : esc(e.reasoning || '')) + '</div>';
+  }
+  function renderCompCard(c, v, locked) {
+    var conf = computeConfidence(c, v);
+    var ev = c.evidenceIds.map(function (id) { return state.evidence[id]; }).filter(Boolean);
+    var contra = ev.filter(function (e) { return e.polarity === 'contradicting'; });
+    var support = ev.filter(function (e) { return e.polarity === 'supporting'; });
+    var h = '<div class="vp-comp ' + (conf.level === 'invalidated' ? 'disconfirmed' : '') + '"><div class="vp-comp-top">';
+    if (locked) h += '<div class="vp-comp-text">' + (c.text ? esc(c.text) : '<span class="vp-empty">(empty)</span>') + ' <span title="People reacted to this wording — fork a new version to change it" style="font-size:11px;color:var(--muted)">🔒</span></div>';
+    else h += '<div style="flex:1;min-width:0"><textarea data-ck="' + c.componentKey + '" rows="2" placeholder="Describe this ' + esc(KIND_LABEL[c.kind].toLowerCase()) + '…">' + esc(c.text) + '</textarea></div>';
+    h += '<div class="vp-conf"><span class="badge ' + conf.level + '">' + conf.level + '</span><div class="score">' + (conf.score ? conf.score + '/100' : '') + '</div></div></div>';
+    h += '<div class="vp-why">' + esc(conf.why) + '</div>';
+    if (contra.length || support.length) { h += '<div class="vp-ev">'; contra.forEach(function (e) { h += evItem(e); }); support.forEach(function (e) { h += evItem(e); }); h += '</div>'; }
+    if (!locked) h += '<div class="vp-comp-actions"><button class="btn tiny danger" data-rmk="' + c.componentKey + '">Remove</button></div>';
+    return h + '</div>';
+  }
+  function renderComponents(v) {
+    var frozen = v.status === 'frozen' || v.status === 'archived';
+    var h = versionBar(v);
+    h += '<div class="vp-intro">' + (frozen
+      ? 'This version is <strong>frozen</strong> — wording people reacted to (🔒) is read-only, so reactions stay tied to what they saw. You can still complete untested components (job-to-be-done, gains) and add new ones. To change locked wording, fork a new version from Transcripts.'
+      : 'This is your living value proposition. Edit any component below; it freezes automatically once a bound cycle records its first reaction.') + '</div>';
+    var drift = driftFlags(v);
+    if (drift.length) h += '<div class="vp-drift"><strong style="color:var(--accent-text)">⚠ ' + drift.length + ' slide' + (drift.length > 1 ? 's have' : ' has') + ' drifted from your value proposition.</strong> <button class="btn tiny" data-vpnav="drift">Review drift →</button></div>';
+    KIND_ORDER.forEach(function (kind) {
+      var comps = Object.keys(v.components).map(function (k) { return v.components[k]; }).filter(function (c) { return c.kind === kind; });
+      h += '<div class="vp-kind-group"><div class="vp-kind-head">' + KIND_LABEL[kind] + ' <button class="btn tiny" data-addk="' + kind + '">+ add</button></div>';
+      if (!comps.length) h += '<div class="vp-empty">None yet.</div>';
+      comps.forEach(function (c) { h += renderCompCard(c, v, frozen && !!c.slideRef); });
+      h += '</div>';
+    });
+    return h;
+  }
+  function renderTranscripts(v) {
+    var c = activeCycle();
+    var ai = state.aiSettings || {};
+    var h = versionBar(v);
+    h += '<div class="vp-intro">Paste an interview transcript, then let Reactioner map what was said back to your components — supporting and contradicting evidence — and propose wording changes for you to approve.</div>';
+    h += '<div class="vp-ai-box"><div class="vp-kind-head">AI analysis</div>'
+      + '<label class="field-label">Anthropic API key (stored only in this browser)</label>'
+      + '<input type="password" id="vp-api-key" placeholder="sk-ant-…" value="' + esc(ai.apiKey || '') + '" />'
+      + '<div style="display:flex;gap:8px;margin-top:8px;align-items:center"><button class="btn tiny" id="vp-save-key">Save key</button><span style="font-size:12px;color:var(--muted)">Model: ' + esc(ai.model || 'claude-haiku-4-5-20251001') + '</span></div></div>';
+    if (!c.interviews) c.interviews = [];
+    (c.participants || []).forEach(function (p) {
+      var iv = c.interviews.filter(function (x) { return x.participantId === p.id; })[0];
+      var raw = iv && iv.transcript ? iv.transcript.raw : '';
+      var an = iv && iv.transcript && iv.transcript.analysis;
+      h += '<div class="vp-comp"><div class="vp-kind-head">' + esc(p.label) + (p.name ? (' — ' + esc(p.name)) : '') + '</div>'
+        + '<textarea data-tx="' + p.id + '" rows="4" placeholder="Paste this interview’s transcript…">' + esc(raw) + '</textarea>'
+        + '<div class="vp-comp-actions"><button class="btn tiny primary" data-analyze="' + p.id + '">✨ Analyze transcript</button>' + (an ? '<span style="font-size:12px;color:var(--muted)">Analyzed ' + esc((an.ranAt || '').slice(0, 10)) + '</span>' : '') + '</div>'
+        + (an && an.summary ? '<div class="vp-why">' + esc(an.summary) + '</div>' : '') + '</div>';
+    });
+    var pend = pendingEdits().filter(function (p) { return p.versionId === v.id; });
+    h += '<div class="vp-kind-head" style="margin-top:18px">Proposed changes (' + pend.length + ')</div>';
+    if (!pend.length) h += '<div class="vp-empty">No pending proposals. Analyze a transcript to generate evidence-based suggestions.</div>';
+    pend.forEach(function (pe) {
+      var comp = v.components[pe.componentKey];
+      h += '<div class="vp-diff ' + (pe.disconfirming ? 'disconfirming' : '') + '"><div class="vp-kind-head">' + (pe.disconfirming ? '⚠ ' : '') + esc(comp ? KIND_LABEL[comp.kind] : pe.type) + ' · ' + esc(pe.type) + '</div>'
+        + (pe.fromText ? '<div><span class="from">' + esc(pe.fromText) + '</span></div>' : '')
+        + '<div><span class="to">' + esc(pe.toText) + '</span></div><div class="reason">' + esc(pe.reason) + '</div>'
+        + '<div class="vp-comp-actions"><button class="btn tiny primary" data-acc="' + pe.id + '">Accept</button><button class="btn tiny" data-rej="' + pe.id + '">Reject</button></div></div>';
+    });
+    var acc = acceptedEdits().filter(function (p) { return p.versionId === v.id; });
+    if (acc.length) h += '<div class="vp-ai-box" style="margin-top:16px"><strong style="color:var(--text)">' + acc.length + ' accepted change' + (acc.length > 1 ? 's' : '') + ' staged.</strong> <button class="btn primary tiny" id="vp-fork">Apply → new version &amp; cycle</button></div>';
+    return h;
+  }
+  function renderEvolution() {
+    var vp = state.valueProp;
+    var h = '<div class="vp-intro">The audit trail of how your value proposition evolved — what changed, why, and the evidence behind it. This is your alignment / fundraising narrative.</div>';
+    h += '<div class="vp-comp-actions" style="margin-bottom:16px"><button class="btn tiny" id="vp-retest">Re-test current version (new cycle)</button></div>';
+    vp.versions.slice().reverse().forEach(function (v) {
+      h += '<div class="vp-evo-item"><span class="dot"></span><h4>' + esc(v.label) + ' <span class="vp-pill ' + v.status + '">' + v.status + '</span></h4>';
+      var parent = v.parentVersionId ? versionById(v.parentVersionId) : null;
+      h += '<div style="font-size:12px;color:var(--muted)">Created ' + esc((v.createdAt || '').slice(0, 10)) + (parent ? (' · forked from ' + esc(parent.label)) : '') + '</div>';
+      if (v.changelog && v.changelog.length) v.changelog.forEach(function (ch) {
+        h += '<div class="vp-diff" style="margin-top:8px"><div class="vp-kind-head">' + esc(ch.type) + ' · ' + esc(ch.componentKey) + '</div>' + (ch.from ? '<div><span class="from">' + esc(ch.from) + '</span></div>' : '') + '<div><span class="to">' + esc(ch.to) + '</span></div><div class="reason">' + esc(ch.reason || '') + '</div></div>';
+      });
+      else h += '<div class="vp-empty">Initial version.</div>';
+      h += '</div>';
+    });
+    return h;
+  }
+  function renderDrift(v) {
+    var h = '<div class="vp-intro">Slides and your value proposition are edited independently. When they drift apart, Reactioner flags it here — you choose which side to update. Nothing changes automatically.</div>';
+    if (!_driftCache.length) return h + '<div class="vp-empty">No drift — your slides and value proposition are in sync. ✓</div>';
+    _driftCache.forEach(function (f, i) {
+      if (f.kind === 'missing-slide') h += '<div class="vp-drift"><div class="vp-kind-head">No slide for this ' + KIND_LABEL[f.comp.kind] + '</div><div class="row"><span class="lab">VP</span><span>' + esc(f.comp.text) + '</span></div><div class="vp-empty">Add a matching statement in the Slides tab to test it.</div></div>';
+      else h += '<div class="vp-drift"><div class="vp-kind-head">' + KIND_LABEL[f.comp.kind] + ' drift</div><div class="row"><span class="lab">VP</span><span>' + esc(f.comp.text) + '</span></div><div class="row"><span class="lab">Slide</span><span>' + esc(f.slideText) + '</span></div><div class="vp-comp-actions"><button class="btn tiny" data-driftslide="' + i + '">Update slide to match VP</button><button class="btn tiny" data-driftvp="' + i + '">Update VP to match slide</button></div></div>';
+    });
+    return h;
+  }
+  function wireVP(host, v) {
+    host.querySelectorAll('[data-sub]').forEach(function (b) { b.addEventListener('click', function () { vpSub = b.dataset.sub; renderVP(); }); });
+    host.querySelectorAll('[data-vpnav]').forEach(function (b) { b.addEventListener('click', function () { vpSub = b.dataset.vpnav; renderVP(); }); });
+    var vs = host.querySelector('#vp-version-select'); if (vs) vs.addEventListener('change', function () { state.valueProp.activeVersionId = vs.value; save(); renderVP(); });
+    host.querySelectorAll('textarea[data-ck]').forEach(function (t) { t.addEventListener('change', function () { var c = v.components[t.dataset.ck]; if (c) { c.text = t.value; save(); renderVP(); } }); });
+    host.querySelectorAll('[data-addk]').forEach(function (b) { b.addEventListener('click', function () { addComponent(v, b.dataset.addk); }); });
+    host.querySelectorAll('[data-rmk]').forEach(function (b) { b.addEventListener('click', function () { if (confirm('Remove this component?')) { delete v.components[b.dataset.rmk]; save(); renderVP(); } }); });
+    host.querySelectorAll('textarea[data-tx]').forEach(function (t) { t.addEventListener('change', function () { saveTranscript(t.dataset.tx, t.value); }); });
+    host.querySelectorAll('[data-analyze]').forEach(function (b) { b.addEventListener('click', function () { analyzeFor(b.dataset.analyze, b); }); });
+    var sk = host.querySelector('#vp-save-key'); if (sk) sk.addEventListener('click', function () { var k = host.querySelector('#vp-api-key'); state.aiSettings.apiKey = k.value.trim(); save(); showToast('API key saved'); });
+    host.querySelectorAll('[data-acc]').forEach(function (b) { b.addEventListener('click', function () { decideEdit(b.dataset.acc, 'accepted'); }); });
+    host.querySelectorAll('[data-rej]').forEach(function (b) { b.addEventListener('click', function () { decideEdit(b.dataset.rej, 'rejected'); }); });
+    var fk = host.querySelector('#vp-fork'); if (fk) fk.addEventListener('click', forkVersion);
+    var rt = host.querySelector('#vp-retest'); if (rt) rt.addEventListener('click', retestVersion);
+    host.querySelectorAll('[data-driftslide]').forEach(function (b) { b.addEventListener('click', function () { var f = _driftCache[+b.dataset.driftslide]; if (f) driftUpdateSlide(f.comp); }); });
+    host.querySelectorAll('[data-driftvp]').forEach(function (b) { b.addEventListener('click', function () { var f = _driftCache[+b.dataset.driftvp]; if (f) driftUpdateVP(f.comp, f.slideText); }); });
+  }
+  function addComponent(v, kind) {
+    var key = kind + '-' + vid('c');
+    v.components[key] = { componentKey: key, kind: kind, text: '', confidence: 'untested', confidenceScore: 0, evidenceIds: [], slideRef: null, pinned: false };
+    save(); renderVP();
+  }
+  function saveTranscript(pid, raw) {
+    var c = activeCycle(); if (!c.interviews) c.interviews = [];
+    var iv = c.interviews.filter(function (x) { return x.participantId === pid; })[0];
+    if (!iv) { iv = { id: vid('iv'), participantId: pid, transcript: null }; c.interviews.push(iv); }
+    iv.transcript = iv.transcript || { raw: '', addedAt: nowISO(), analysis: null };
+    iv.transcript.raw = raw; iv.transcript.addedAt = nowISO();
+    save();
+  }
+  function analyzeFor(pid, btn) {
+    var c = activeCycle();
+    var iv = (c.interviews || []).filter(function (x) { return x.participantId === pid; })[0];
+    if (!iv || !iv.transcript || !iv.transcript.raw.trim()) { showToast('Add a transcript first'); return; }
+    if (!state.aiSettings || !state.aiSettings.apiKey) { showToast('Add your Anthropic API key first'); return; }
+    var old = btn.textContent; btn.textContent = 'Analyzing…'; btn.disabled = true;
+    runAnalysis(c, iv).then(function () { showToast('Analysis complete'); renderVP(); })
+      .catch(function (e) { showToast('Analysis failed: ' + e.message); btn.textContent = old; btn.disabled = false; });
+  }
+
+  function renderVP() {
+    ensureVP();
+    var host = document.getElementById('view-vp');
+    if (!host) return;
+    var v = activeVersion();
+    var subs = [['components', 'Components'], ['transcripts', 'Transcripts'], ['evolution', 'Evolution'], ['drift', 'Drift']];
+    var h = '<div class="vp-subnav">' + subs.map(function (s) { return '<button data-sub="' + s[0] + '" class="' + (vpSub === s[0] ? 'active' : '') + '">' + s[1] + '</button>'; }).join('') + '</div>';
+    if (vpSub === 'components') h += renderComponents(v);
+    else if (vpSub === 'transcripts') h += renderTranscripts(v);
+    else if (vpSub === 'evolution') h += renderEvolution();
+    else { _driftCache = driftFlags(v); h += renderDrift(v); }
+    host.innerHTML = h;
+    wireVP(host, v);
+  }
+  window.renderVP = renderVP;
+
+  /* create the view container next to the other views */
+  (function initContainer() {
+    if (document.getElementById('view-vp')) return;
+    var ref = document.getElementById('view-settings');
+    var host = ref ? ref.parentNode : (document.getElementById('interviewer-ui') || document.body);
+    var d = document.createElement('div'); d.id = 'view-vp'; d.style.display = 'none';
+    if (ref && ref.parentNode) ref.parentNode.insertBefore(d, ref); else host.appendChild(d);
+  })();
+
+  /* if the VP tab was the last-open view, re-render now that renderVP exists */
+  if (typeof state !== 'undefined' && state && state.activeView === 'vp' && typeof setView === 'function') {
+    try { setView('vp'); } catch (e) {}
+  }
 })();
 </script>
 </body>
