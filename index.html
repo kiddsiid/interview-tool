@@ -1053,10 +1053,9 @@
 .vp-gate-card { background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:16px; max-width:560px; width:100%; padding:26px 26px 22px; box-shadow:var(--shadow); max-height:92vh; overflow:auto; }
 .vp-gate-card h2 { color:var(--text); }
 .vp-gate-sub { color:var(--muted); font-size:13.5px; line-height:1.55; margin:0 0 16px; }
-.vp-sentence { font-size:16px; line-height:2.2; color:var(--text); margin:2px 0 10px; }
-.vp-blank { display:inline; border:none; border-bottom:2px solid var(--accent); background:transparent; color:var(--accent-text); font:inherit; font-weight:600; padding:0 5px 1px; min-width:40px; outline:none; white-space:pre-wrap; word-break:break-word; }
-.vp-blank:empty::before { content:attr(data-ph); color:var(--muted); font-style:italic; font-weight:400; }
-.vp-blank:focus { background:var(--accent-soft); border-bottom-color:var(--accent); border-radius:5px 5px 0 0; }
+.vp-statement { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:10px; padding:11px 13px; font-family:inherit; font-size:15px; line-height:1.5; resize:vertical; }
+.vp-statement::placeholder { color:var(--muted); font-style:italic; }
+.vp-statement:focus { outline:2px solid var(--accent); border-color:var(--accent); }
 #vp-settings-panel h3 { color:var(--text); }
 </style>
 </head>
@@ -4294,9 +4293,27 @@ function showToast(msg) {
     if (!state.valueProp || !state.valueProp.versions || !state.valueProp.versions.length) buildInitialVP();
     if (!state.valueProp.proposedEdits) state.valueProp.proposedEdits = [];
     if (state.schemaVersion == null || state.schemaVersion < 3) state.schemaVersion = 3;
+    migrateTemplateToStatement();
     bindCycles();
     freezeCollecting();
     save();
+  }
+  /* One-time: carry a previous three-part template into the new free-text statement,
+     so anyone who used the earlier build keeps their wording and confirmed status. */
+  function migrateTemplateToStatement() {
+    var vp = state.valueProp;
+    if (!vp || vp._statementMigrated) return;
+    var v0 = activeVersion();
+    var tp = vp.template;
+    if (v0 && tp && (typeof v0.statement !== 'string' || !v0.statement.trim())) {
+      var parts = [];
+      if (tp.targetAudience) parts.push('I help ' + tp.targetAudience);
+      if (tp.pains) parts.push('overcome ' + tp.pains);
+      if (tp.offerings) parts.push('by providing ' + tp.offerings);
+      if (parts.length) v0.statement = parts.join(' ');
+    }
+    if (vp.templateConfirmed && vp.statementConfirmed == null) vp.statementConfirmed = true;
+    vp._statementMigrated = true;
   }
   function buildInitialVP() {
     var v1 = { id: vid('vpv'), label: 'v1', createdAt: nowISO(), parentVersionId: null, status: 'draft', frozenAt: null, components: {}, changelog: [] };
@@ -4441,7 +4458,7 @@ function showToast(msg) {
     var cur = activeVersion();
     var accepted = acceptedEdits().filter(function (p) { return p.versionId === cur.id; });
     if (!accepted.length && !confirm('No accepted changes for this version yet. Create an identical new version anyway?')) return;
-    var nv = { id: vid('vpv'), label: 'v' + (state.valueProp.versions.length + 1), createdAt: nowISO(), parentVersionId: cur.id, status: 'draft', frozenAt: null, components: JSON.parse(JSON.stringify(cur.components)), changelog: [] };
+    var nv = { id: vid('vpv'), label: 'v' + (state.valueProp.versions.length + 1), createdAt: nowISO(), parentVersionId: cur.id, status: 'draft', frozenAt: null, statement: (typeof cur.statement === 'string' ? cur.statement : ''), components: JSON.parse(JSON.stringify(cur.components)), changelog: [] };
     Object.keys(nv.components).forEach(function (k) { nv.components[k].evidenceIds = []; nv.components[k].confidence = 'untested'; nv.components[k].confidenceScore = 0; });
     accepted.forEach(function (p) {
       if (p.type === 'reword' && nv.components[p.componentKey]) {
@@ -4645,7 +4662,7 @@ function showToast(msg) {
     var rt = host.querySelector('#vp-retest'); if (rt) rt.addEventListener('click', retestVersion);
     host.querySelectorAll('[data-driftslide]').forEach(function (b) { b.addEventListener('click', function () { var f = _driftCache[+b.dataset.driftslide]; if (f) driftUpdateSlide(f.comp); }); });
     host.querySelectorAll('[data-driftvp]').forEach(function (b) { b.addEventListener('click', function () { var f = _driftCache[+b.dataset.driftvp]; if (f) driftUpdateVP(f.comp, f.slideText); }); });
-    wireTemplateEditor(host, 'vpstmt', function () { vpSub = 'statement'; renderVP(); });
+    wireStatementEditor(host, 'vpstmt', function () { vpSub = 'statement'; renderVP(); });
   }
   function addComponent(v, kind) {
     var key = kind + '-' + vid('c');
@@ -4692,36 +4709,20 @@ function showToast(msg) {
     var keys = Object.keys(v.components).filter(function (k) { return v.components[k].kind === kind; });
     return keys.length ? v.components[keys[0]] : null;
   }
-  function currentTemplate() {
-    var vp = state.valueProp;
-    if (vp && vp.template) return { targetAudience: vp.template.targetAudience || '', pains: vp.template.pains || '', offerings: vp.template.offerings || '' };
-    var v = activeVersion(); var out = { targetAudience: '', pains: '', offerings: '' };
-    if (v) { var j = findPrimary(v, 'jtbd'), p = findPrimary(v, 'pain'), pr = findPrimary(v, 'promise'); out.targetAudience = j ? j.text : ''; out.pains = p ? p.text : ''; out.offerings = pr ? pr.text : ''; }
-    return out;
+  /* The VP statement is now ONE free-text field stored on the version.
+     It is NOT parsed into components — components are filled separately. */
+  var VP_SEED = 'I help [target audience] overcome [their specific pains or needs] by providing [my current offerings, products or services, or hybrid]';
+  function currentStatement() {
+    var v = activeVersion();
+    if (v && typeof v.statement === 'string' && v.statement.trim()) return v.statement;
+    return VP_SEED;
   }
-  function setOrProposeComponent(v, kind, text) {
-    text = (text || '').trim(); if (!text) return 0;
-    var comp = findPrimary(v, kind);
-    var frozen = (v.status === 'frozen' || v.status === 'archived');
-    if (!comp) { var key = kind + '-' + vid('c'); v.components[key] = { componentKey: key, kind: kind, text: text, confidence: 'untested', confidenceScore: 0, evidenceIds: [], slideRef: null, pinned: false }; return 0; }
-    if (norm(comp.text) === norm(text)) return 0;
-    if (frozen && comp.slideRef) {
-      state.valueProp.proposedEdits.push({ id: vid('pe'), componentKey: comp.componentKey, type: 'reword', fromText: comp.text, toText: text, reason: 'Aligned to your value-proposition statement.', evidenceIds: [], disconfirming: false, status: 'pending', createdAt: nowISO(), versionId: v.id });
-      return 1;
-    }
-    comp.text = text; return 0;
-  }
-  function applyTemplate(tpl) {
+  function saveStatement(text) {
     ensureVP();
     var v = activeVersion();
-    state.valueProp.template = { targetAudience: (tpl.targetAudience || '').trim(), pains: (tpl.pains || '').trim(), offerings: (tpl.offerings || '').trim() };
-    state.valueProp.templateConfirmed = true;
-    var staged = 0;
-    staged += setOrProposeComponent(v, 'jtbd', tpl.targetAudience);
-    staged += setOrProposeComponent(v, 'pain', tpl.pains);
-    staged += setOrProposeComponent(v, 'promise', tpl.offerings);
+    v.statement = (text || '').trim();
+    state.valueProp.statementConfirmed = true;
     save();
-    return staged;
   }
   function hasContent() { return (state.cycles || []).some(function (c) { return (c.slides && c.slides.length) || cycleHasReactions(c); }); }
   function isParticipantContext() {
@@ -4729,39 +4730,30 @@ function showToast(msg) {
     return !!(document.body && document.body.classList.contains('participant-mode'));
   }
   function authGateOpen() { var g = document.getElementById('vit-auth-gate'); try { return !!g && getComputedStyle(g).display !== 'none'; } catch (e) { return false; } }
-  function tplBlank(id, ph, val) {
-    return '<span class="vp-blank" id="' + id + '" contenteditable="true" role="textbox" aria-label="' + esc(ph) + '" data-ph="' + esc(ph) + '" onkeydown="if(event.key===\'Enter\')event.preventDefault()">' + esc(val || '') + '</span>';
-  }
-  function templateEditorHTML(p) {
-    var t = currentTemplate();
-    return '<div class="vp-tpl"><p class="vp-sentence">My value proposition is: I help '
-      + tplBlank(p + '-aud', 'independent restaurant owners with 1–3 locations', t.targetAudience) + ' overcome '
-      + tplBlank(p + '-pain', 'their specific pains or needs', t.pains) + ' by providing '
-      + tplBlank(p + '-off', 'my current offerings, products or services, or hybrid', t.offerings) + '.</p>'
+  function statementEditorHTML(p) {
+    return '<div class="vp-tpl"><textarea class="vp-statement" id="' + p + '-stmt" rows="4" placeholder="' + esc(VP_SEED) + '">' + esc(currentStatement()) + '</textarea>'
       + '<div class="vp-comp-actions"><button class="btn primary tiny" id="' + p + '-save">Save value proposition</button></div>'
       + '<div class="vp-empty" id="' + p + '-msg"></div></div>';
   }
-  function readTemplate(root, p) {
-    function g(id) { var e = root.querySelector('#' + p + '-' + id); if (!e) return ''; var v = (e.value != null ? e.value : (e.textContent || '')); return v.replace(/\s+/g, ' ').trim(); }
-    return { targetAudience: g('aud'), pains: g('pain'), offerings: g('off') };
+  function readStatement(root, p) {
+    var e = root.querySelector('#' + p + '-stmt');
+    return e ? (e.value || '').trim() : '';
   }
-  function wireTemplateEditor(root, p, onSaved) {
+  function wireStatementEditor(root, p, onSaved) {
     var b = root.querySelector('#' + p + '-save'); if (!b) return;
     b.addEventListener('click', function () {
-      var t = readTemplate(root, p);
+      var txt = readStatement(root, p);
       var msg = root.querySelector('#' + p + '-msg');
-      if (!t.targetAudience || !t.pains || !t.offerings) { if (msg) msg.textContent = 'Please fill in all three blanks.'; return; }
-      var staged = applyTemplate(t);
-      showToast(staged ? ('Saved — ' + staged + ' change(s) staged for review') : 'Value proposition saved');
+      if (!txt) { if (msg) msg.textContent = 'Please write your value proposition.'; return; }
+      saveStatement(txt);
+      showToast('Value proposition saved');
       if (onSaved) onSaved();
     });
   }
   function renderStatement(v) {
     var h = versionBar(v);
-    h += '<div class="vp-intro">Your value proposition in one sentence. Reactioner maps the three blanks into your components (audience → job-to-be-done, pains → pain, offering → promise). Editing here flows through versioning and slide-drift checks — it never silently overwrites frozen wording.</div>';
-    h += templateEditorHTML('vpstmt');
-    var d = driftFlags(v);
-    if (d.length) h += '<div class="vp-drift" style="margin-top:14px"><strong style="color:var(--accent-text)">⚠ ' + d.length + ' slide' + (d.length > 1 ? 's' : '') + ' may need aligning.</strong> <button class="btn tiny" data-vpnav="drift">Review drift →</button></div>';
+    h += '<div class="vp-intro">Your value proposition, in your own words — one free-text statement that evolves as you learn. It is no longer split into fields, and it does not auto-fill your components. Your components (job-to-be-done, pains, gains, promise, features, price) are filled in separately, from transcripts and the Components tab. The statement is saved on this version and carried forward when you fork.</div>';
+    h += statementEditorHTML('vpstmt');
     return h;
   }
   function renderVPInSettings() {
@@ -4770,10 +4762,10 @@ function showToast(msg) {
     var old = document.getElementById('vp-settings-panel'); if (old) old.remove();
     ensureVP();
     var panel = document.createElement('div'); panel.id = 'vp-settings-panel'; panel.className = 'panel'; panel.style.marginTop = '16px';
-    panel.innerHTML = '<h3 style="margin-top:0">💎 Value proposition</h3>' + templateEditorHTML('vpset')
-      + '<div class="vp-empty">Changes propose updates to your components (they don’t silently overwrite wording people reacted to) and flag any slides that drift out of sync.</div>';
+    panel.innerHTML = '<h3 style="margin-top:0">💎 Value proposition</h3>' + statementEditorHTML('vpset')
+      + '<div class="vp-empty">Your value proposition in free text. It is saved on the current version and carried forward when you fork. Your components are managed separately in the Value Prop tab — this statement no longer fills them in.</div>';
     host.appendChild(panel);
-    wireTemplateEditor(panel, 'vpset', function () { var d = driftFlags(activeVersion()); renderVPInSettings(); if (d.length) showToast(d.length + ' slide(s) drifted — see Value Prop → Drift'); });
+    wireStatementEditor(panel, 'vpset', function () { renderVPInSettings(); });
   }
   window.renderVPInSettings = renderVPInSettings;
 
@@ -4786,9 +4778,9 @@ function showToast(msg) {
     var wrap = document.createElement('div'); wrap.id = 'vp-gate';
     wrap.innerHTML = '<div class="vp-gate-card"><h2 style="margin:0 0 6px">' + (existing ? 'Confirm your value proposition' : 'Welcome — start with your value proposition') + '</h2>'
       + '<p class="vp-gate-sub">' + (existing
-        ? 'Before you continue, confirm or complete your value proposition. We’ll check that your existing slides line up with it.'
-        : 'Reactioner is built around your value proposition. Fill in the blanks — this becomes v1, and everything you test evolves from it.') + '</p>'
-      + templateEditorHTML('vpgate')
+        ? 'Before you continue, confirm or write your value proposition. This is your statement in your own words — you can rewrite it completely, including the example wording.'
+        : 'Reactioner is built around your value proposition. Write it in your own words — this becomes v1, and everything you test evolves from it. You can rewrite the example below entirely.') + '</p>'
+      + statementEditorHTML('vpgate')
       + (existing ? '<div style="text-align:center;margin-top:4px"><button id="vp-gate-later" style="background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px">I’ll do this later</button></div>' : '')
       + '</div>';
     document.body.appendChild(wrap);
@@ -4796,15 +4788,14 @@ function showToast(msg) {
     if (saveBtn) {
       saveBtn.textContent = existing ? 'Confirm & continue' : 'Save & continue';
       saveBtn.addEventListener('click', function () {
-        var tpl = readTemplate(wrap, 'vpgate');
+        var txt = readStatement(wrap, 'vpgate');
         var msg = wrap.querySelector('#vpgate-msg');
-        if (!tpl.targetAudience || !tpl.pains || !tpl.offerings) { if (msg) msg.textContent = 'Please fill in all three blanks to continue.'; return; }
-        var staged = applyTemplate(tpl);
-        var d = driftFlags(activeVersion());
+        if (!txt) { if (msg) msg.textContent = 'Please write your value proposition to continue.'; return; }
+        saveStatement(txt);
         wrap.remove();
-        vpSub = d.length ? 'drift' : 'statement';
+        vpSub = 'statement';
         if (typeof setView === 'function') setView('vp');
-        showToast(d.length ? (d.length + ' slide(s) may need aligning — see Drift') : (staged ? ('Saved — ' + staged + ' change(s) staged for review') : 'Value proposition saved'));
+        showToast('Value proposition saved');
       });
     }
     var later = wrap.querySelector('#vp-gate-later'); if (later) later.addEventListener('click', function () { wrap.remove(); });
@@ -4813,9 +4804,9 @@ function showToast(msg) {
     try {
       if (typeof state === 'undefined' || !state) return;
       if (isParticipantContext() || authGateOpen()) return;
-      if (state.valueProp && state.valueProp.templateConfirmed) return;
+      if (state.valueProp && state.valueProp.statementConfirmed) return;
       ensureVP();
-      if (state.valueProp.templateConfirmed) return;
+      if (state.valueProp.statementConfirmed) return;
       showVPGate();
     } catch (e) {}
   };
