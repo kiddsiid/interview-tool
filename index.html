@@ -1048,6 +1048,17 @@
 .vp-ai-box { background:var(--soft); border:1px solid var(--border); border-radius:10px; padding:12px 14px; margin-bottom:14px; }
 .vp-empty { color:var(--muted); font-size:13px; font-style:italic; padding:8px 0; }
 .vp-comp textarea, .vp-ai-box input, .vp-ai-box textarea { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:8px 10px; font-family:inherit; font-size:13px; }
+/* required guided VP statement + gate */
+#vp-gate { position:fixed; inset:0; z-index:1500; background:rgba(0,0,0,0.55); display:flex; align-items:center; justify-content:center; padding:20px; overflow:auto; }
+.vp-gate-card { background:var(--panel); color:var(--text); border:1px solid var(--border); border-radius:16px; max-width:560px; width:100%; padding:26px 26px 22px; box-shadow:var(--shadow); max-height:92vh; overflow:auto; }
+.vp-gate-card h2 { color:var(--text); }
+.vp-gate-sub { color:var(--muted); font-size:13.5px; line-height:1.55; margin:0 0 16px; }
+.vp-tpl-lead { font-weight:700; color:var(--text); margin:0 0 10px; font-size:15px; }
+.vp-tpl-row { margin-bottom:12px; }
+.vp-tpl-con { display:block; font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--accent-text); margin-bottom:3px; }
+.vp-tpl-row textarea { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-family:inherit; font-size:14px; line-height:1.45; }
+.vp-tpl-row textarea:focus { outline:2px solid var(--accent); border-color:var(--accent); }
+#vp-settings-panel h3 { color:var(--text); }
 </style>
 </head>
 <body>
@@ -2063,7 +2074,8 @@ function setView(v) {
   if (v === 'edit') renderEditSlides();
   if (v === 'participants') renderParticipants();
   if (v === 'vp') { if (typeof renderVP === 'function') renderVP(); }
-  if (v === 'settings') renderExportPreview();
+  if (v === 'settings') { renderExportPreview(); if (typeof renderVPInSettings === 'function') renderVPInSettings(); }
+  if (typeof vpGateCheck === 'function') vpGateCheck();
 }
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setView(t.dataset.view)));
 
@@ -4258,7 +4270,7 @@ function showToast(msg) {
 </script>
 <script>
 /* ============================================================
-   VALUE-PROPOSITION DISCOVERY ENGINE  (additive module)
+   VALUE-PROPOSITION DISCOVERY ENGINE  (additive module)  [build:vp2]
    Reuses global: state, activeCycle, defaultCycle, uid, rkey,
    reactionToScore, save, showToast, escapeHtml, renderCycleSelect
    ============================================================ */
@@ -4634,6 +4646,7 @@ function showToast(msg) {
     var rt = host.querySelector('#vp-retest'); if (rt) rt.addEventListener('click', retestVersion);
     host.querySelectorAll('[data-driftslide]').forEach(function (b) { b.addEventListener('click', function () { var f = _driftCache[+b.dataset.driftslide]; if (f) driftUpdateSlide(f.comp); }); });
     host.querySelectorAll('[data-driftvp]').forEach(function (b) { b.addEventListener('click', function () { var f = _driftCache[+b.dataset.driftvp]; if (f) driftUpdateVP(f.comp, f.slideText); }); });
+    wireTemplateEditor(host, 'vpstmt', function () { vpSub = 'statement'; renderVP(); });
   }
   function addComponent(v, kind) {
     var key = kind + '-' + vid('c');
@@ -4663,9 +4676,10 @@ function showToast(msg) {
     var host = document.getElementById('view-vp');
     if (!host) return;
     var v = activeVersion();
-    var subs = [['components', 'Components'], ['transcripts', 'Transcripts'], ['evolution', 'Evolution'], ['drift', 'Drift']];
+    var subs = [['statement', 'Statement'], ['components', 'Components'], ['transcripts', 'Transcripts'], ['evolution', 'Evolution'], ['drift', 'Drift']];
     var h = '<div class="vp-subnav">' + subs.map(function (s) { return '<button data-sub="' + s[0] + '" class="' + (vpSub === s[0] ? 'active' : '') + '">' + s[1] + '</button>'; }).join('') + '</div>';
-    if (vpSub === 'components') h += renderComponents(v);
+    if (vpSub === 'statement') h += renderStatement(v);
+    else if (vpSub === 'components') h += renderComponents(v);
     else if (vpSub === 'transcripts') h += renderTranscripts(v);
     else if (vpSub === 'evolution') h += renderEvolution();
     else { _driftCache = driftFlags(v); h += renderDrift(v); }
@@ -4673,6 +4687,137 @@ function showToast(msg) {
     wireVP(host, v);
   }
   window.renderVP = renderVP;
+
+  /* ---------- structured value-proposition statement (fill-in-the-blank) ---------- */
+  function findPrimary(v, kind) {
+    var keys = Object.keys(v.components).filter(function (k) { return v.components[k].kind === kind; });
+    return keys.length ? v.components[keys[0]] : null;
+  }
+  function currentTemplate() {
+    var vp = state.valueProp;
+    if (vp && vp.template) return { targetAudience: vp.template.targetAudience || '', pains: vp.template.pains || '', offerings: vp.template.offerings || '' };
+    var v = activeVersion(); var out = { targetAudience: '', pains: '', offerings: '' };
+    if (v) { var j = findPrimary(v, 'jtbd'), p = findPrimary(v, 'pain'), pr = findPrimary(v, 'promise'); out.targetAudience = j ? j.text : ''; out.pains = p ? p.text : ''; out.offerings = pr ? pr.text : ''; }
+    return out;
+  }
+  function setOrProposeComponent(v, kind, text) {
+    text = (text || '').trim(); if (!text) return 0;
+    var comp = findPrimary(v, kind);
+    var frozen = (v.status === 'frozen' || v.status === 'archived');
+    if (!comp) { var key = kind + '-' + vid('c'); v.components[key] = { componentKey: key, kind: kind, text: text, confidence: 'untested', confidenceScore: 0, evidenceIds: [], slideRef: null, pinned: false }; return 0; }
+    if (norm(comp.text) === norm(text)) return 0;
+    if (frozen && comp.slideRef) {
+      state.valueProp.proposedEdits.push({ id: vid('pe'), componentKey: comp.componentKey, type: 'reword', fromText: comp.text, toText: text, reason: 'Aligned to your value-proposition statement.', evidenceIds: [], disconfirming: false, status: 'pending', createdAt: nowISO(), versionId: v.id });
+      return 1;
+    }
+    comp.text = text; return 0;
+  }
+  function applyTemplate(tpl) {
+    ensureVP();
+    var v = activeVersion();
+    state.valueProp.template = { targetAudience: (tpl.targetAudience || '').trim(), pains: (tpl.pains || '').trim(), offerings: (tpl.offerings || '').trim() };
+    state.valueProp.templateConfirmed = true;
+    var staged = 0;
+    staged += setOrProposeComponent(v, 'jtbd', tpl.targetAudience);
+    staged += setOrProposeComponent(v, 'pain', tpl.pains);
+    staged += setOrProposeComponent(v, 'promise', tpl.offerings);
+    save();
+    return staged;
+  }
+  function hasContent() { return (state.cycles || []).some(function (c) { return (c.slides && c.slides.length) || cycleHasReactions(c); }); }
+  function isParticipantContext() {
+    try { var pr = new URLSearchParams(location.search); if (pr.get('view') === 'participant' || pr.get('data') || pr.get('code')) return true; } catch (e) {}
+    return !!(document.body && document.body.classList.contains('participant-mode'));
+  }
+  function authGateOpen() { var g = document.getElementById('vit-auth-gate'); try { return !!g && getComputedStyle(g).display !== 'none'; } catch (e) { return false; } }
+  function tplField(id, ph, val) { return '<textarea id="' + id + '" rows="2" placeholder="' + esc(ph) + '">' + esc(val || '') + '</textarea>'; }
+  function templateEditorHTML(p) {
+    var t = currentTemplate();
+    return '<div class="vp-tpl"><div class="vp-tpl-lead">My value proposition is:</div>'
+      + '<div class="vp-tpl-row"><span class="vp-tpl-con">I help</span>' + tplField(p + '-aud', 'e.g. independent restaurant owners with 1–3 locations', t.targetAudience) + '</div>'
+      + '<div class="vp-tpl-row"><span class="vp-tpl-con">overcome</span>' + tplField(p + '-pain', 'e.g. losing money to no-shows and manual scheduling', t.pains) + '</div>'
+      + '<div class="vp-tpl-row"><span class="vp-tpl-con">by providing</span>' + tplField(p + '-off', 'e.g. an automated booking and deposit tool', t.offerings) + '</div>'
+      + '<div class="vp-comp-actions"><button class="btn primary tiny" id="' + p + '-save">Save value proposition</button></div>'
+      + '<div class="vp-empty" id="' + p + '-msg"></div></div>';
+  }
+  function readTemplate(root, p) {
+    function g(id) { var e = root.querySelector('#' + p + '-' + id); return e ? e.value.trim() : ''; }
+    return { targetAudience: g('aud'), pains: g('pain'), offerings: g('off') };
+  }
+  function wireTemplateEditor(root, p, onSaved) {
+    var b = root.querySelector('#' + p + '-save'); if (!b) return;
+    b.addEventListener('click', function () {
+      var t = readTemplate(root, p);
+      var msg = root.querySelector('#' + p + '-msg');
+      if (!t.targetAudience || !t.pains || !t.offerings) { if (msg) msg.textContent = 'Please fill in all three blanks.'; return; }
+      var staged = applyTemplate(t);
+      showToast(staged ? ('Saved — ' + staged + ' change(s) staged for review') : 'Value proposition saved');
+      if (onSaved) onSaved();
+    });
+  }
+  function renderStatement(v) {
+    var h = versionBar(v);
+    h += '<div class="vp-intro">Your value proposition in one sentence. Reactioner maps the three blanks into your components (audience → job-to-be-done, pains → pain, offering → promise). Editing here flows through versioning and slide-drift checks — it never silently overwrites frozen wording.</div>';
+    h += templateEditorHTML('vpstmt');
+    var d = driftFlags(v);
+    if (d.length) h += '<div class="vp-drift" style="margin-top:14px"><strong style="color:var(--accent-text)">⚠ ' + d.length + ' slide' + (d.length > 1 ? 's' : '') + ' may need aligning.</strong> <button class="btn tiny" data-vpnav="drift">Review drift →</button></div>';
+    return h;
+  }
+  function renderVPInSettings() {
+    if (isParticipantContext()) return;
+    var host = document.getElementById('view-settings'); if (!host) return;
+    var old = document.getElementById('vp-settings-panel'); if (old) old.remove();
+    ensureVP();
+    var panel = document.createElement('div'); panel.id = 'vp-settings-panel'; panel.className = 'panel'; panel.style.marginTop = '16px';
+    panel.innerHTML = '<h3 style="margin-top:0">💎 Value proposition</h3>' + templateEditorHTML('vpset')
+      + '<div class="vp-empty">Changes propose updates to your components (they don’t silently overwrite wording people reacted to) and flag any slides that drift out of sync.</div>';
+    host.appendChild(panel);
+    wireTemplateEditor(panel, 'vpset', function () { var d = driftFlags(activeVersion()); renderVPInSettings(); if (d.length) showToast(d.length + ' slide(s) drifted — see Value Prop → Drift'); });
+  }
+  window.renderVPInSettings = renderVPInSettings;
+
+  /* ---------- required guided VP gate (signup + existing-account prompt) ---------- */
+  function showVPGate() {
+    if (isParticipantContext() || authGateOpen()) return;
+    if (document.getElementById('vp-gate')) return;
+    ensureVP();
+    var existing = hasContent();
+    var wrap = document.createElement('div'); wrap.id = 'vp-gate';
+    wrap.innerHTML = '<div class="vp-gate-card"><h2 style="margin:0 0 6px">' + (existing ? 'Confirm your value proposition' : 'Welcome — start with your value proposition') + '</h2>'
+      + '<p class="vp-gate-sub">' + (existing
+        ? 'Before you continue, confirm or complete your value proposition. We’ll check that your existing slides line up with it.'
+        : 'Reactioner is built around your value proposition. Fill in the blanks — this becomes v1, and everything you test evolves from it.') + '</p>'
+      + templateEditorHTML('vpgate')
+      + (existing ? '<div style="text-align:center;margin-top:4px"><button id="vp-gate-later" style="background:none;border:none;color:var(--muted);text-decoration:underline;cursor:pointer;font-size:12px">I’ll do this later</button></div>' : '')
+      + '</div>';
+    document.body.appendChild(wrap);
+    var saveBtn = wrap.querySelector('#vpgate-save');
+    if (saveBtn) {
+      saveBtn.textContent = existing ? 'Confirm & continue' : 'Save & continue';
+      saveBtn.addEventListener('click', function () {
+        var tpl = readTemplate(wrap, 'vpgate');
+        var msg = wrap.querySelector('#vpgate-msg');
+        if (!tpl.targetAudience || !tpl.pains || !tpl.offerings) { if (msg) msg.textContent = 'Please fill in all three blanks to continue.'; return; }
+        var staged = applyTemplate(tpl);
+        var d = driftFlags(activeVersion());
+        wrap.remove();
+        vpSub = d.length ? 'drift' : 'statement';
+        if (typeof setView === 'function') setView('vp');
+        showToast(d.length ? (d.length + ' slide(s) may need aligning — see Drift') : (staged ? ('Saved — ' + staged + ' change(s) staged for review') : 'Value proposition saved'));
+      });
+    }
+    var later = wrap.querySelector('#vp-gate-later'); if (later) later.addEventListener('click', function () { wrap.remove(); });
+  }
+  window.vpGateCheck = function () {
+    try {
+      if (typeof state === 'undefined' || !state) return;
+      if (isParticipantContext() || authGateOpen()) return;
+      if (state.valueProp && state.valueProp.templateConfirmed) return;
+      ensureVP();
+      if (state.valueProp.templateConfirmed) return;
+      showVPGate();
+    } catch (e) {}
+  };
 
   /* create the view container next to the other views */
   (function initContainer() {
@@ -4687,6 +4832,8 @@ function showToast(msg) {
   if (typeof state !== 'undefined' && state && state.activeView === 'vp' && typeof setView === 'function') {
     try { setView('vp'); } catch (e) {}
   }
+  /* required guided VP entry — shows once signed in (waits behind the auth gate) */
+  try { window.vpGateCheck(); } catch (e) {}
 })();
 </script>
 </body>
