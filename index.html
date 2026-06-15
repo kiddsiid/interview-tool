@@ -4765,7 +4765,23 @@ function showToast(msg) {
     var v = activeVersion();
     v.statement = (text || '').trim();
     state.valueProp.statementConfirmed = true;
+    try { localStorage.setItem(vpGateKey(), '1'); } catch (e) {}
     save();
+  }
+  /* A founder already has a value proposition if they confirmed it, a version has
+     a written statement, or any version is frozen/archived (reactions collected). */
+  function vpGateKey() { var u = (typeof currentUserId !== 'undefined' && currentUserId) ? ('-' + currentUserId) : ''; return 'reactioner-vp-gate' + u; }
+  function vpEstablished() {
+    if (!state || !state.valueProp) return false;
+    var vp = state.valueProp;
+    if (vp.statementConfirmed) return true;
+    var versions = vp.versions || [];
+    for (var i = 0; i < versions.length; i++) {
+      var v = versions[i];
+      if (v && v.statement && String(v.statement).trim()) return true;
+      if (v && (v.status === 'frozen' || v.status === 'archived')) return true;
+    }
+    return false;
   }
   function hasContent() { return (state.cycles || []).some(function (c) { return (c.slides && c.slides.length) || cycleHasReactions(c); }); }
   function isParticipantContext() {
@@ -4847,9 +4863,11 @@ function showToast(msg) {
     try {
       if (typeof state === 'undefined' || !state) return;
       if (isParticipantContext() || authGateOpen()) return;
-      if (state.valueProp && state.valueProp.statementConfirmed) return;
+      // Durable per-founder flag: once entered on this device, never prompt again.
+      try { if (localStorage.getItem(vpGateKey()) === '1') return; } catch (e) {}
+      if (vpEstablished()) { try { localStorage.setItem(vpGateKey(), '1'); } catch (e) {} return; }
       ensureVP();
-      if (state.valueProp.statementConfirmed) return;
+      if (vpEstablished()) { try { localStorage.setItem(vpGateKey(), '1'); } catch (e) {} return; }
       showVPGate();
     } catch (e) {}
   };
@@ -5020,6 +5038,8 @@ function showToast(msg) {
       gen.disabled = true; var old = gen.textContent; gen.textContent = 'Generating…';
       var statusEl = panel.querySelector('#collect-gen-status');
       try {
+        var langSel = document.getElementById('pp-lang'); var mineLang = panel.querySelector('#collect-lang');
+        if (langSel && mineLang) langSel.value = mineLang.value;
         var url = await buildCollectUrl();
         if (linkEl) linkEl.value = url;
         if (inviteEl) inviteEl.value = inviteText(url);
@@ -5044,6 +5064,18 @@ function showToast(msg) {
     if (cl) cl.addEventListener('click', function () { if (!linkEl.value) { showToast('Generate the link first'); return; } navigator.clipboard.writeText(linkEl.value).then(function () { showToast('Link copied'); }, function () { showToast('Select & copy manually'); }); });
     var ci = panel.querySelector('#collect-copy-invite');
     if (ci) ci.addEventListener('click', function () { if (!inviteEl.value) { showToast('Generate the link first'); return; } navigator.clipboard.writeText(inviteEl.value).then(function () { showToast('Invite copied'); }, function () { showToast('Select & copy manually'); }); });
+    // In-person hand-off: reuse the existing (now-hidden) control + its handler
+    var ho = panel.querySelector('#collect-handover');
+    if (ho) ho.addEventListener('click', function () {
+      var slot = panel.querySelector('#collect-pp-target');
+      var legacy = document.getElementById('share-pp-target');
+      var open = document.getElementById('open-participant-view');
+      if (legacy && slot && slot.value) legacy.value = slot.value;
+      if (open) open.click(); else showToast('In-person hand-off is unavailable here.');
+    });
+    // Offline file: reuse the existing standalone generator
+    var dl = panel.querySelector('#collect-download');
+    if (dl) dl.addEventListener('click', function () { var b = document.getElementById('generate-standalone-btn'); if (b) b.click(); else showToast('File export is unavailable here.'); });
     var pull = panel.querySelector('#collect-pull');
     if (pull) pull.addEventListener('click', function () { pull.disabled = true; Promise.resolve(pullRemoteResponses(panel.querySelector('#collect-pull-status'))).then(function () { pull.disabled = false; }, function () { pull.disabled = false; }); });
     var imp = panel.querySelector('#collect-import');
@@ -5065,18 +5097,34 @@ function showToast(msg) {
     var host = document.getElementById('view-share');
     if (!host) return;
     var old = document.getElementById('collect-panel'); if (old) old.remove();
+    // Consolidate: this panel is the single share hub — hide the old duplicate Step 1 / Step 2 sections.
+    Array.prototype.forEach.call(host.children, function (ch) { if (ch.id !== 'collect-panel') ch.style.display = 'none'; });
     var signedIn = !!((typeof sb !== 'undefined' && sb) && (typeof currentUserId !== 'undefined' && currentUserId));
+    var c = (typeof activeCycle === 'function') ? activeCycle() : null;
+    var ppOpts = (c && c.participants ? c.participants : []).map(function (p) { return '<option value="' + p.id + '">' + esc(p.label + (p.name ? ' — ' + p.name : '')) + '</option>'; }).join('');
     var panel = document.createElement('div'); panel.className = 'collect-panel'; panel.id = 'collect-panel';
-    panel.innerHTML = '<h3>📣 Collect reactions remotely</h3>'
-      + '<p class="collect-sub">Send this cycle’s slides by text. People react on their own phone — no call — and the results come back into this cycle’s heatmap.</p>'
-      + '<div class="collect-row"><span class="collect-label">1 · Cycle link</span><input class="mono" id="collect-link" readonly placeholder="Tap “Generate” to create the link" /><div class="collect-actions"><button class="btn tiny primary" id="collect-gen">Generate link &amp; invite</button><button class="btn tiny" id="collect-copy-link">Copy link</button></div><div class="collect-status" id="collect-gen-status"></div></div>'
-      + '<div class="collect-row"><span class="collect-label">2 · Invite text — paste &amp; send from your phone</span><textarea id="collect-invite" rows="3" placeholder="Generate the link first…"></textarea><div class="collect-actions"><button class="btn tiny primary" id="collect-copy-invite">📋 Copy invite</button></div></div>'
-      + '<div class="collect-row"><span class="collect-label">3 · Bring responses in</span>'
+    panel.innerHTML = '<h3>🔗 Share &amp; collect reactions</h3>'
+      + '<p class="collect-sub">One place to gather reactions — send your slides to people remotely, or hand someone your device in person, then bring their responses into this cycle’s heatmap.</p>'
+      + '<div class="collect-row"><span class="collect-label">Send to people remotely</span>'
+        + '<div class="collect-actions" style="margin-bottom:6px"><label style="font-size:12px;color:var(--muted);align-self:center">Language</label><select id="collect-lang"><option value="en">English</option><option value="es">Español (Centroamérica)</option><option value="fr">Français</option></select></div>'
+        + '<input class="mono" id="collect-link" readonly placeholder="Tap “Generate” to create the link" />'
+        + '<div class="collect-actions"><button class="btn tiny primary" id="collect-gen">Generate link &amp; invite</button><button class="btn tiny" id="collect-copy-link">Copy link</button></div>'
+        + '<div class="collect-status" id="collect-gen-status"></div>'
+        + '<textarea id="collect-invite" rows="3" placeholder="Your invite text appears here once you generate — paste &amp; send it from your phone." style="margin-top:8px"></textarea>'
+        + '<div class="collect-actions"><button class="btn tiny" id="collect-copy-invite">📋 Copy invite</button></div></div>'
+      + '<div class="collect-row"><span class="collect-label">Or hand someone your device (in person)</span>'
+        + '<div class="collect-actions"><select id="collect-pp-target">' + ppOpts + '</select><button class="btn tiny primary" id="collect-handover">Hand it over →</button></div>'
+        + '<div class="collect-sub" style="margin-top:4px">Their reactions save to the chosen slot automatically. Tap your browser’s Back button when they’re done.</div></div>'
+      + '<div class="collect-row"><span class="collect-label">Bring responses into the heatmap</span>'
         + '<div class="collect-actions"><button class="btn tiny primary" id="collect-pull">↻ Pull responses (automatic)</button></div>'
-        + '<div class="collect-status" id="collect-pull-status">' + (signedIn ? 'Tap “Pull” to fetch anyone who has finished.' : 'Sign in (top-right) to enable automatic pull — or just paste codes below.') + '</div>'
-        + '<details class="collect-setup"><summary>One-time setup for automatic pull</summary><p class="collect-sub" style="margin-top:8px">Run this once in your Supabase project’s SQL editor, then sign in. Until then, the paste-codes box below works with zero setup.</p><pre>' + esc(SETUP_SQL) + '</pre><p class="collect-sub">Note: anyone with the link can submit to this cycle; the cycle key is a long secret embedded in the link. Fine for value-prop reactions — don’t use it for sensitive data.</p></details>'
-      + '</div>'
-      + '<div class="collect-row"><span class="collect-label">Or paste codes — works with zero setup</span><textarea class="mono" id="collect-codes" rows="3" placeholder="Paste one or more RXN-… codes, one per line"></textarea><div class="collect-actions"><button class="btn tiny primary" id="collect-import">Import all codes</button></div><div class="collect-status" id="collect-import-status"></div></div>';
+        + '<div class="collect-status" id="collect-pull-status">' + (signedIn ? 'Tap “Pull” to fetch anyone who has finished.' : 'Sign in (top-right) to enable automatic pull — or paste codes below.') + '</div>'
+        + '<textarea class="mono" id="collect-codes" rows="3" placeholder="Or paste one or more RXN-… codes, one per line" style="margin-top:8px"></textarea>'
+        + '<div class="collect-actions"><button class="btn tiny primary" id="collect-import">Import codes</button></div>'
+        + '<div class="collect-status" id="collect-import-status"></div></div>'
+      + '<details class="collect-setup"><summary>More options &amp; one-time setup</summary>'
+        + '<div class="collect-row" style="margin-top:10px"><span class="collect-label">Send as a file (offline / no internet)</span><div class="collect-actions"><button class="btn tiny" id="collect-download">⬇ Download a file to send</button></div><div class="collect-sub" style="margin-top:4px">Attach it to an email or message; they open it on their phone and react — no internet needed.</div></div>'
+        + '<div class="collect-row"><span class="collect-label">Automatic pull — one-time setup</span><p class="collect-sub" style="margin-top:6px">Run this once in your Supabase project’s SQL editor, then sign in. Until then, the paste-codes box works with zero setup.</p><pre>' + esc(SETUP_SQL) + '</pre><p class="collect-sub">Note: anyone with the link can submit to this cycle; the cycle key is a long secret embedded in the link. Fine for value-prop reactions — don’t use it for sensitive data.</p></div>'
+        + '</details>';
     host.insertBefore(panel, host.firstChild);
     wireCollect(panel);
   }
