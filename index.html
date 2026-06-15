@@ -1057,6 +1057,22 @@
 .vp-statement::placeholder { color:var(--muted); font-style:italic; }
 .vp-statement:focus { outline:2px solid var(--accent); border-color:var(--accent); }
 #vp-settings-panel h3 { color:var(--text); }
+/* ===== Remote collect (Share tab) ===== */
+.collect-panel { background:var(--soft); border:1px solid var(--border); border-radius:12px; padding:16px 18px; margin:0 0 18px; }
+.collect-panel h3 { margin:0 0 4px; color:var(--text); font-size:16px; }
+.collect-sub { color:var(--muted); font-size:13px; line-height:1.5; margin:0 0 12px; }
+.collect-row { margin-bottom:14px; }
+.collect-label { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--accent-text); margin-bottom:5px; display:block; }
+.collect-panel textarea, .collect-panel input { width:100%; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:9px 11px; font-family:inherit; font-size:13px; line-height:1.45; }
+.collect-panel textarea.mono, .collect-panel input.mono { font-family:ui-monospace,Menlo,Monaco,Consolas,monospace; font-size:12px; }
+.collect-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; }
+.collect-status { font-size:12.5px; color:var(--muted); margin-top:8px; }
+.collect-setup { margin-top:10px; }
+.collect-setup summary { cursor:pointer; color:var(--accent-text); font-size:12.5px; font-weight:600; }
+.collect-setup pre { background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:11.5px; overflow:auto; white-space:pre; }
+.pp-auto-status { max-width:440px; margin:14px auto; padding:11px 16px; border-radius:10px; font-size:14px; line-height:1.45; background:var(--soft); border:1px solid var(--border); color:var(--text); }
+.pp-auto-status.ok { background:var(--like-bg); border-color:var(--like-c); color:var(--like-c); }
+.pp-auto-status.err { background:var(--dis-bg); border-color:var(--dis-c); color:var(--dis-c); }
 </style>
 </head>
 <body>
@@ -2068,7 +2084,7 @@ function setView(v) {
   });
   if (v === 'interview') renderInterview();
   if (v === 'heatmap') renderHeatmap();
-  if (v === 'share') renderShare();
+  if (v === 'share') { renderShare(); if (typeof renderCollectPanel === 'function') renderCollectPanel(); }
   if (v === 'edit') renderEditSlides();
   if (v === 'participants') renderParticipants();
   if (v === 'vp') { if (typeof renderVP === 'function') renderVP(); }
@@ -3820,6 +3836,8 @@ async function initParticipantMode() {
   const dataParam = params.get('data');
   const localMode = params.get('local') === '1';
   const ppParam = params.get('pp');
+  const collectFid = params.get('fid');   // founder's user id, for auto-sync return
+  const collectCid = params.get('cid');   // cycle id this response belongs to
   const langRaw = (params.get('lang') || 'en').toLowerCase();
   const ppLang = PP_LANGS.indexOf(langRaw) !== -1 ? langRaw : 'en';
   document.documentElement.lang = ppLang;
@@ -4136,6 +4154,7 @@ async function initParticipantMode() {
     const smsHref = 'sms:?&body=' + encodeURIComponent(shareMsg);
     const mailHref = 'mailto:?subject=' + encodeURIComponent('Validation interview reactions') + '&body=' + encodeURIComponent(shareMsg);
     const canShare = !!navigator.share;
+    const autoEligible = !!(sb && collectFid);
     root.innerHTML = `<div class="pp-done-screen">
       <h2>${PT.dTitle}</h2>
       <div style="font-size:24px;margin:10px 0 4px">
@@ -4144,7 +4163,8 @@ async function initParticipantMode() {
         ${counts.dislike ? `👎 ${counts.dislike}` : ''}
       </div>
       <p style="color:var(--muted);margin:6px 0 4px">${ppState.name ? PT.thanksName(escapeHtml(ppState.name)) : PT.thanksNo}</p>
-      <div style="background:#fff8e1;border:1px solid #f1c40f;padding:12px 16px;border-radius:10px;margin:14px auto 14px;max-width:440px;text-align:left;font-size:14px;line-height:1.5">
+      ${autoEligible ? '<div id="pp-auto-status" class="pp-auto-status">📡 Sending your reactions to the interviewer…</div>' : ''}
+      <div id="pp-manual-block" style="background:#fff8e1;border:1px solid #f1c40f;padding:12px 16px;border-radius:10px;margin:14px auto 14px;max-width:440px;text-align:left;font-size:14px;line-height:1.5">
         ${PT.oneMore}
       </div>
       <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px">
@@ -4188,6 +4208,29 @@ async function initParticipantMode() {
       URL.revokeObjectURL(url);
     });
     document.getElementById('pp-back2').addEventListener('click', () => { ppState.currentIdx = slides.length - 1; ppSave(); render(); });
+
+    // Auto-sync: send the reactions straight to the interviewer's cycle (no paste needed).
+    // Requires the one-time Supabase "mvs_responses" table (see Share tab setup notes).
+    if (autoEligible && !ppState.autoSent) {
+      (async () => {
+        try {
+          const ins = await sb.from('mvs_responses').insert({
+            founder_id: collectFid,
+            cycle_key: collectCid || '',
+            name: ppState.name || '',
+            payload: { code: code, v: 2 }
+          });
+          if (ins && ins.error) throw ins.error;
+          ppState.autoSent = true; ppSave();
+          const el = document.getElementById('pp-auto-status');
+          if (el) { el.textContent = '✓ Sent automatically — you’re all done. You can close this page.'; el.classList.add('ok'); }
+          const mb = document.getElementById('pp-manual-block'); if (mb) mb.style.display = 'none';
+        } catch (e) {
+          const el = document.getElementById('pp-auto-status');
+          if (el) { el.textContent = '⚠ Couldn’t send automatically — please use one of the options below to send your code.'; el.classList.add('err'); }
+        }
+      })();
+    }
   }
 
   function ppToast(msg) {
@@ -4826,6 +4869,185 @@ function showToast(msg) {
   }
   /* required guided VP entry — shows once signed in (waits behind the auth gate) */
   try { window.vpGateCheck(); } catch (e) {}
+})();
+</script>
+<script>
+/* ============================================================
+   REMOTE COLLECT  (additive module)  [build:collect1]
+   Grow a cycle's heatmap from people invited by text. Reuses:
+   state, activeCycle, uid, rkey, save, showToast, escapeHtml,
+   decodePayload, parseRxnInput, matchReactionsToCycle,
+   buildParticipantUrl, renderHeatmap, currentUserId, sb
+   ============================================================ */
+(function () {
+  function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(s) : String(s == null ? '' : s); }
+  function codeHash(s) { var h = 0; for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return 'c' + (h >>> 0); }
+
+  var SETUP_SQL = [
+    'create table if not exists public.mvs_responses (',
+    '  id uuid primary key default gen_random_uuid(),',
+    '  founder_id uuid not null,',
+    '  cycle_key text not null,',
+    '  name text,',
+    '  payload jsonb not null,',
+    '  created_at timestamptz not null default now()',
+    ');',
+    'alter table public.mvs_responses enable row level security;',
+    'create policy mvs_insert on public.mvs_responses',
+    '  for insert to anon, authenticated with check (true);',
+    'create policy mvs_select_own on public.mvs_responses',
+    '  for select to authenticated using (auth.uid() = founder_id);',
+    'create index if not exists mvs_lookup on public.mvs_responses (founder_id, cycle_key, created_at);'
+  ].join('\n');
+
+  function inviteText(url) {
+    return "Hey! Got 3 minutes? I'm testing some ideas and want your gut reaction. "
+      + "Tap this and react to each line with ❤️, 👍 or 👎 (no right answers, no call needed):\n" + url;
+  }
+
+  async function buildCollectUrl() {
+    var c = activeCycle();
+    var url = await buildParticipantUrl();
+    var u = new URL(url);
+    u.searchParams.set('cid', c.id);
+    if (typeof currentUserId !== 'undefined' && currentUserId) u.searchParams.set('fid', currentUserId);
+    return u.toString();
+  }
+
+  function createRemoteParticipant(c, name, labelPrefix) {
+    if (!c.participants) c.participants = [];
+    var prefix = labelPrefix || 'Remote';
+    var n = 0;
+    for (var i = 0; i < c.participants.length; i++) { if (String(c.participants[i].label || '').indexOf(prefix) === 0) n++; }
+    var p = { id: uid(), label: prefix + ' ' + (n + 1), name: name || '' };
+    c.participants.push(p);
+    return p;
+  }
+
+  /* Decode one RXN code, match it to the active cycle, and land it on a NEW
+     participant so it merges cleanly into the heatmap (keyed participant|slide|statement). */
+  function importOneCode(codeStr, name, labelPrefix) {
+    if (!codeStr) return false;
+    var payload;
+    try { payload = decodePayload(String(codeStr).replace(/^RXN-/, '').replace(/\s+/g, '')); } catch (e) { return false; }
+    var parsed;
+    try { parsed = parseRxnInput(payload); } catch (e) { return false; }
+    var c = activeCycle();
+    var result = matchReactionsToCycle(parsed, c);
+    if (!result || !result.applied || !result.applied.length) return false;
+    var p = createRemoteParticipant(c, name || parsed.name || '', labelPrefix || 'Remote');
+    for (var i = 0; i < result.applied.length; i++) {
+      var m = result.applied[i];
+      c.reactions[rkey(p.id, m.slideId, m.stmtId)] = { reaction: m.reaction, phrases: '' };
+    }
+    return true;
+  }
+
+  function batchImportCodes(text) {
+    var lines = String(text || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    var c = activeCycle();
+    if (!c.importedCodeHashes) c.importedCodeHashes = [];
+    var added = 0, dupes = 0, failed = 0;
+    for (var i = 0; i < lines.length; i++) {
+      var normd = lines[i].replace(/^RXN-/, '').replace(/\s+/g, '');
+      if (!normd) continue;
+      var h = codeHash(normd);
+      if (c.importedCodeHashes.indexOf(h) >= 0) { dupes++; continue; }
+      var ok = importOneCode(lines[i], '', 'Remote');
+      c.importedCodeHashes.push(h);
+      if (ok) added++; else failed++;
+    }
+    save();
+    return { added: added, dupes: dupes, failed: failed };
+  }
+
+  async function pullRemoteResponses(statusEl) {
+    var c = activeCycle();
+    function setS(t) { if (statusEl) statusEl.textContent = t; }
+    if (typeof sb === 'undefined' || !sb) { setS('Cloud isn’t configured in this build.'); return; }
+    if (typeof currentUserId === 'undefined' || !currentUserId) { setS('Sign in (top-right) to pull automatically — or use the paste-codes box below.'); return; }
+    setS('Checking for responses…');
+    var rows;
+    try {
+      var res = await sb.from('mvs_responses').select('id,name,payload,created_at').eq('founder_id', currentUserId).eq('cycle_key', c.id).order('created_at', { ascending: true });
+      if (res.error) throw res.error;
+      rows = res.data || [];
+    } catch (e) {
+      setS('Couldn’t reach the responses table. If you haven’t set it up yet, open “One-time setup” above. (' + (e && e.message ? e.message : e) + ')');
+      return;
+    }
+    if (!c.importedResponseIds) c.importedResponseIds = [];
+    var added = 0, unreadable = 0;
+    for (var i = 0; i < rows.length; i++) {
+      var row = rows[i];
+      if (c.importedResponseIds.indexOf(row.id) >= 0) continue;
+      var code = (row.payload && row.payload.code) ? String(row.payload.code) : '';
+      var ok = importOneCode(code, row.name || '', 'Remote');
+      c.importedResponseIds.push(row.id);
+      if (ok) added++; else unreadable++;
+    }
+    save();
+    if (state.activeView === 'heatmap' && typeof renderHeatmap === 'function') renderHeatmap();
+    if (added) setS('✓ Pulled ' + added + ' new response' + (added > 1 ? 's' : '') + ' into this cycle’s heatmap.' + (unreadable ? (' ' + unreadable + ' could not be read.') : ''));
+    else setS(rows.length ? ('No new responses (all ' + rows.length + ' already imported).') : 'No responses yet.');
+    showToast(added ? ('Imported ' + added + ' remote response' + (added > 1 ? 's' : '')) : 'No new responses');
+  }
+
+  function wireCollect(panel) {
+    var linkEl = panel.querySelector('#collect-link');
+    var inviteEl = panel.querySelector('#collect-invite');
+    var gen = panel.querySelector('#collect-gen');
+    if (gen) gen.addEventListener('click', async function () {
+      gen.disabled = true; var old = gen.textContent; gen.textContent = 'Generating…';
+      try {
+        var url = await buildCollectUrl();
+        if (linkEl) linkEl.value = url;
+        if (inviteEl) inviteEl.value = inviteText(url);
+        try { await navigator.clipboard.writeText(url); showToast('Link generated & copied'); } catch (e) { showToast('Link generated'); }
+      } catch (e) { showToast('Could not generate link'); }
+      gen.disabled = false; gen.textContent = old;
+    });
+    var cl = panel.querySelector('#collect-copy-link');
+    if (cl) cl.addEventListener('click', function () { if (!linkEl.value) { showToast('Generate the link first'); return; } navigator.clipboard.writeText(linkEl.value).then(function () { showToast('Link copied'); }, function () { showToast('Select & copy manually'); }); });
+    var ci = panel.querySelector('#collect-copy-invite');
+    if (ci) ci.addEventListener('click', function () { if (!inviteEl.value) { showToast('Generate the link first'); return; } navigator.clipboard.writeText(inviteEl.value).then(function () { showToast('Invite copied'); }, function () { showToast('Select & copy manually'); }); });
+    var pull = panel.querySelector('#collect-pull');
+    if (pull) pull.addEventListener('click', function () { pull.disabled = true; Promise.resolve(pullRemoteResponses(panel.querySelector('#collect-pull-status'))).then(function () { pull.disabled = false; }, function () { pull.disabled = false; }); });
+    var imp = panel.querySelector('#collect-import');
+    if (imp) imp.addEventListener('click', function () {
+      var ta = panel.querySelector('#collect-codes');
+      var r = batchImportCodes(ta ? ta.value : '');
+      var st = panel.querySelector('#collect-import-status');
+      var parts = [];
+      if (r.added) parts.push(r.added + ' imported');
+      if (r.dupes) parts.push(r.dupes + ' already in');
+      if (r.failed) parts.push(r.failed + ' unreadable');
+      if (st) st.textContent = parts.length ? ('✓ ' + parts.join(', ') + '.') : 'Nothing to import — paste some codes first.';
+      if (r.added) { if (ta) ta.value = ''; showToast('Imported ' + r.added + ' code' + (r.added > 1 ? 's' : '')); if (state.activeView === 'heatmap' && typeof renderHeatmap === 'function') renderHeatmap(); }
+    });
+  }
+
+  function renderCollectPanel() {
+    try { if (new URLSearchParams(location.search).get('view') === 'participant') return; } catch (e) {}
+    var host = document.getElementById('view-share');
+    if (!host) return;
+    var old = document.getElementById('collect-panel'); if (old) old.remove();
+    var signedIn = !!((typeof sb !== 'undefined' && sb) && (typeof currentUserId !== 'undefined' && currentUserId));
+    var panel = document.createElement('div'); panel.className = 'collect-panel'; panel.id = 'collect-panel';
+    panel.innerHTML = '<h3>📣 Collect reactions remotely</h3>'
+      + '<p class="collect-sub">Send this cycle’s slides by text. People react on their own phone — no call — and the results come back into this cycle’s heatmap.</p>'
+      + '<div class="collect-row"><span class="collect-label">1 · Cycle link</span><input class="mono" id="collect-link" readonly placeholder="Tap “Generate” to create the link" /><div class="collect-actions"><button class="btn tiny primary" id="collect-gen">Generate link &amp; invite</button><button class="btn tiny" id="collect-copy-link">Copy link</button></div></div>'
+      + '<div class="collect-row"><span class="collect-label">2 · Invite text — paste &amp; send from your phone</span><textarea id="collect-invite" rows="3" placeholder="Generate the link first…"></textarea><div class="collect-actions"><button class="btn tiny primary" id="collect-copy-invite">📋 Copy invite</button></div></div>'
+      + '<div class="collect-row"><span class="collect-label">3 · Bring responses in</span>'
+        + '<div class="collect-actions"><button class="btn tiny primary" id="collect-pull">↻ Pull responses (automatic)</button></div>'
+        + '<div class="collect-status" id="collect-pull-status">' + (signedIn ? 'Tap “Pull” to fetch anyone who has finished.' : 'Sign in (top-right) to enable automatic pull — or just paste codes below.') + '</div>'
+        + '<details class="collect-setup"><summary>One-time setup for automatic pull</summary><p class="collect-sub" style="margin-top:8px">Run this once in your Supabase project’s SQL editor, then sign in. Until then, the paste-codes box below works with zero setup.</p><pre>' + esc(SETUP_SQL) + '</pre><p class="collect-sub">Note: anyone with the link can submit to this cycle; the cycle key is a long secret embedded in the link. Fine for value-prop reactions — don’t use it for sensitive data.</p></details>'
+      + '</div>'
+      + '<div class="collect-row"><span class="collect-label">Or paste codes — works with zero setup</span><textarea class="mono" id="collect-codes" rows="3" placeholder="Paste one or more RXN-… codes, one per line"></textarea><div class="collect-actions"><button class="btn tiny primary" id="collect-import">Import all codes</button></div><div class="collect-status" id="collect-import-status"></div></div>';
+    host.insertBefore(panel, host.firstChild);
+    wireCollect(panel);
+  }
+  window.renderCollectPanel = renderCollectPanel;
 })();
 </script>
 </body>
