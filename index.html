@@ -4907,11 +4907,30 @@ function showToast(msg) {
 
   async function buildCollectUrl() {
     var c = activeCycle();
-    var url = await buildParticipantUrl();
-    var u = new URL(url);
-    u.searchParams.set('cid', c.id);
-    if (typeof currentUserId !== 'undefined' && currentUserId) u.searchParams.set('fid', currentUserId);
-    return u.toString();
+    if (!c) throw new Error('No active cycle to share.');
+    // Need at least one slide with a headline or a non-empty statement, or the link is useless.
+    var hasContent = Array.isArray(c.slides) && c.slides.some(function (s) {
+      return (s.headline && String(s.headline).trim()) || (Array.isArray(s.statements) && s.statements.some(function (st) { return st && st.text && String(st.text).trim(); }));
+    });
+    if (!hasContent) throw new Error('NO_SLIDES');
+    // Build the slides link. Reuse the app's encoder; fall back to the plain
+    // (uncompressed) encoder if that path throws in the user's browser.
+    var base = '';
+    try {
+      base = await buildParticipantUrl();
+    } catch (e1) {
+      try {
+        var data = encodePayload({ cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap });
+        var origin = String((typeof location !== 'undefined' && location.href) || '').split(/[?#]/)[0];
+        if (!origin) throw new Error('no page origin');
+        base = origin + '?view=participant&data=' + data;
+      } catch (e2) { throw new Error('ENCODE_FAILED:' + (e1 && e1.message ? e1.message : e1)); }
+    }
+    if (!base || typeof base !== 'string') throw new Error('ENCODE_FAILED:empty link');
+    // Append cycle + founder ids by string (no new URL() — avoids origin/parse edge cases).
+    var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'cid=' + encodeURIComponent(c.id);
+    if (typeof currentUserId !== 'undefined' && currentUserId) url += '&fid=' + encodeURIComponent(currentUserId);
+    return url;
   }
 
   function createRemoteParticipant(c, name, labelPrefix) {
@@ -4999,12 +5018,26 @@ function showToast(msg) {
     var gen = panel.querySelector('#collect-gen');
     if (gen) gen.addEventListener('click', async function () {
       gen.disabled = true; var old = gen.textContent; gen.textContent = 'Generating…';
+      var statusEl = panel.querySelector('#collect-gen-status');
       try {
         var url = await buildCollectUrl();
         if (linkEl) linkEl.value = url;
         if (inviteEl) inviteEl.value = inviteText(url);
+        var signedIn = (typeof currentUserId !== 'undefined' && currentUserId);
+        var local = (typeof location !== 'undefined' && location.protocol === 'file:');
+        if (statusEl) statusEl.textContent = local
+          ? '⚠ Link created, but it’s a file:// link — host the app so phones can open it, or use the paste-codes box for returns.'
+          : (signedIn ? 'Link ready — copy it or the invite below. Responses auto-sync; tap “Pull” to fetch them.' : 'Link ready. You’re not signed in, so responses come back as codes — paste them in the box below.');
         try { await navigator.clipboard.writeText(url); showToast('Link generated & copied'); } catch (e) { showToast('Link generated'); }
-      } catch (e) { showToast('Could not generate link'); }
+      } catch (e) {
+        var msg = (e && e.message) ? e.message : String(e);
+        var friendly;
+        if (msg === 'NO_SLIDES') friendly = 'Add slides to this cycle first (✏️ Slides tab), then generate the link.';
+        else if (msg.indexOf('ENCODE_FAILED') === 0) friendly = 'Could not build the link — encoding failed (' + msg.replace('ENCODE_FAILED:', '') + ').';
+        else friendly = 'Could not generate link: ' + msg;
+        if (statusEl) statusEl.textContent = friendly;
+        showToast(friendly);
+      }
       gen.disabled = false; gen.textContent = old;
     });
     var cl = panel.querySelector('#collect-copy-link');
@@ -5036,7 +5069,7 @@ function showToast(msg) {
     var panel = document.createElement('div'); panel.className = 'collect-panel'; panel.id = 'collect-panel';
     panel.innerHTML = '<h3>📣 Collect reactions remotely</h3>'
       + '<p class="collect-sub">Send this cycle’s slides by text. People react on their own phone — no call — and the results come back into this cycle’s heatmap.</p>'
-      + '<div class="collect-row"><span class="collect-label">1 · Cycle link</span><input class="mono" id="collect-link" readonly placeholder="Tap “Generate” to create the link" /><div class="collect-actions"><button class="btn tiny primary" id="collect-gen">Generate link &amp; invite</button><button class="btn tiny" id="collect-copy-link">Copy link</button></div></div>'
+      + '<div class="collect-row"><span class="collect-label">1 · Cycle link</span><input class="mono" id="collect-link" readonly placeholder="Tap “Generate” to create the link" /><div class="collect-actions"><button class="btn tiny primary" id="collect-gen">Generate link &amp; invite</button><button class="btn tiny" id="collect-copy-link">Copy link</button></div><div class="collect-status" id="collect-gen-status"></div></div>'
       + '<div class="collect-row"><span class="collect-label">2 · Invite text — paste &amp; send from your phone</span><textarea id="collect-invite" rows="3" placeholder="Generate the link first…"></textarea><div class="collect-actions"><button class="btn tiny primary" id="collect-copy-invite">📋 Copy invite</button></div></div>'
       + '<div class="collect-row"><span class="collect-label">3 · Bring responses in</span>'
         + '<div class="collect-actions"><button class="btn tiny primary" id="collect-pull">↻ Pull responses (automatic)</button></div>'
