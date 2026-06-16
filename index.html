@@ -2614,7 +2614,10 @@ async function buildParticipantUrl() {
   const data = await encodePayloadCompressed(slidesPayload);
   const base = window.location.href.split(/[?#]/)[0];
   const lang = shareLang();
-  return `${base}?view=participant&data=${data}` + (lang && lang !== 'en' ? `&lang=${lang}` : '');
+  // Fresh session id per generated link, so each new link starts a blank reaction
+  // run (otherwise the same cycle's slides reuse the same saved session on a device).
+  const sid = 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  return `${base}?view=participant&data=${data}&sid=${sid}` + (lang && lang !== 'en' ? `&lang=${lang}` : '');
 }
 
 function updateLinkLengthInfo(currentUrl) {
@@ -3900,7 +3903,8 @@ async function initParticipantMode() {
   }
 
   // Restore any partial in-progress reactions (per-link or per-localPpId)
-  const sessionKey = PP_STORAGE_KEY + ':' + (localMode ? ('local-' + targetParticipantId) : ('link-' + dataParam.slice(0, 16))) + (ppLang !== 'en' ? '-' + ppLang : '');
+  const sidParam = params.get('sid');
+  const sessionKey = PP_STORAGE_KEY + ':' + (localMode ? ('local-' + targetParticipantId) : ('link-' + (sidParam || dataParam.slice(0, 16)))) + (ppLang !== 'en' ? '-' + ppLang : '');
   let ppState = (() => {
     try { return JSON.parse(localStorage.getItem(sessionKey)) || { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
     catch { return { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
@@ -4217,6 +4221,13 @@ async function initParticipantMode() {
 
     // Auto-sync: send the reactions straight to the interviewer's cycle (no paste needed).
     // Requires the one-time Supabase "mvs_responses" table (see Share tab setup notes).
+    if (autoEligible && ppState.autoSent) {
+      // Restored an already-submitted session: don't re-send, but don't leave the
+      // status stuck on "Sending…" either.
+      var elDone = document.getElementById('pp-auto-status');
+      if (elDone) { elDone.textContent = '✓ Already sent to the interviewer — you can close this page.'; elDone.classList.add('ok'); }
+      var mbDone = document.getElementById('pp-manual-block'); if (mbDone) mbDone.style.display = 'none';
+    }
     if (autoEligible && !ppState.autoSent) {
       (async () => {
         try {
