@@ -4917,8 +4917,10 @@ function showToast(msg) {
     '  created_at timestamptz not null default now()',
     ');',
     'alter table public.mvs_responses enable row level security;',
+    'drop policy if exists mvs_insert on public.mvs_responses;',
     'create policy mvs_insert on public.mvs_responses',
     '  for insert to anon, authenticated with check (true);',
+    'drop policy if exists mvs_select_own on public.mvs_responses;',
     'create policy mvs_select_own on public.mvs_responses',
     '  for select to authenticated using (auth.uid() = founder_id);',
     'create index if not exists mvs_lookup on public.mvs_responses (founder_id, cycle_key, created_at);'
@@ -5058,9 +5060,13 @@ function showToast(msg) {
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       if (c.importedResponseIds.indexOf(row.id) >= 0) { already++; continue; }
-      var rr = importOneCode(codeFromRow(row), row.name || '');
+      var theCode = codeFromRow(row);
+      var rr = importOneCode(theCode, row.name || '');
       if (rr.ok) { c.importedResponseIds.push(row.id); added++; }
-      else { unreadable++; reasons[rr.reason] = (reasons[rr.reason] || 0) + 1; }   // don't mark imported -> recoverable
+      else {
+        unreadable++; reasons[rr.reason] = (reasons[rr.reason] || 0) + 1;   // don't mark imported -> recoverable
+        try { console.warn('[Reactioner] response import failed — reason:', rr.reason, '| payload type:', (typeof (row.payload)), '| code length:', (theCode || '').length, '| code start:', (theCode || '').slice(0, 24)); } catch (e) {}
+      }
     }
     save();
     // Refresh the heatmap if it's showing, so the new people appear immediately.
@@ -5068,6 +5074,9 @@ function showToast(msg) {
     function reasonMsg() {
       if (reasons.no_reactions) return 'they tapped through without actually reacting';
       if (reasons.no_match) return 'their reactions didn’t line up with this cycle’s slides';
+      if (reasons.empty) return 'no reaction code was stored with the response (open the browser console for details)';
+      if (reasons.decode) return 'the reaction code couldn’t be decoded';
+      if (reasons.parse) return 'the stored data wasn’t a valid reaction code';
       return 'the response data couldn’t be read';
     }
     if (added) setS('✓ Pulled ' + added + ' new response' + (added > 1 ? 's' : '') + ' — open the 🔥 Results tab to see them.' + (unreadable ? (' ' + unreadable + ' skipped (' + reasonMsg() + ').') : ''));
