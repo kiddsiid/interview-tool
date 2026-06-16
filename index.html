@@ -4976,23 +4976,48 @@ function showToast(msg) {
     return p;
   }
 
-  /* Decode one RXN code, match it to the active cycle, and land it on a NEW
-     participant so it merges cleanly into the heatmap (keyed participant|slide|statement). */
-  function importOneCode(codeStr, name, labelPrefix) {
-    if (!codeStr) return false;
+  /* Robustly pull a usable RXN code out of a stored response row, whatever shape
+     Supabase returns the jsonb payload in: { code }, a JSON string, a raw "RXN-…"
+     string, or the raw reactions object itself. */
+  function codeFromRow(row) {
+    var pl = row && row.payload;
+    if (pl == null) return '';
+    if (typeof pl === 'string') {
+      var t = pl.trim();
+      if (t.indexOf('RXN-') === 0) return t;
+      try { pl = JSON.parse(t); } catch (e) { return ''; }
+    }
+    if (pl && typeof pl === 'object') {
+      if (pl.code) return String(pl.code);
+      if (pl.v === 2 && Array.isArray(pl.data)) { try { return 'RXN-' + encodePayload(pl); } catch (e) { return ''; } }
+    }
+    return '';
+  }
+  function countIncomingReactions(parsed) {
+    if (!parsed) return 0;
+    if (parsed.version === 1) { var rx = parsed.reactions || {}; return Object.keys(rx).filter(function (k) { return rx[k]; }).length; }
+    var n = 0;
+    (parsed.data || []).forEach(function (s) { if (s.hr) n++; (s.s || []).forEach(function (x) { if (x.r) n++; }); });
+    return n;
+  }
+  /* Decode one RXN code, match it to the active cycle, and land it on a participant.
+     Returns { ok, reason } so the caller can explain exactly what happened. */
+  function importOneCode(codeStr, name) {
+    if (!codeStr) return { ok: false, reason: 'empty' };
     var payload;
-    try { payload = decodePayload(String(codeStr).replace(/^RXN-/, '').replace(/\s+/g, '')); } catch (e) { return false; }
+    try { payload = decodePayload(String(codeStr).replace(/^RXN-/, '').replace(/\s+/g, '')); } catch (e) { return { ok: false, reason: 'decode' }; }
     var parsed;
-    try { parsed = parseRxnInput(payload); } catch (e) { return false; }
+    try { parsed = parseRxnInput(payload); } catch (e) { return { ok: false, reason: 'parse' }; }
+    if (countIncomingReactions(parsed) === 0) return { ok: false, reason: 'no_reactions' };
     var c = activeCycle();
     var result = matchReactionsToCycle(parsed, c);
-    if (!result || !result.applied || !result.applied.length) return false;
-    var p = createRemoteParticipant(c, name || parsed.name || '', labelPrefix || 'Remote');
+    if (!result || !result.applied || !result.applied.length) return { ok: false, reason: 'no_match' };
+    var p = createRemoteParticipant(c, name || parsed.name || '');
     for (var i = 0; i < result.applied.length; i++) {
       var m = result.applied[i];
       c.reactions[rkey(p.id, m.slideId, m.stmtId)] = { reaction: m.reaction, phrases: '' };
     }
-    return true;
+    return { ok: true, reason: 'ok' };
   }
 
   function batchImportCodes(text) {
@@ -5005,8 +5030,8 @@ function showToast(msg) {
       if (!normd) continue;
       var h = codeHash(normd);
       if (c.importedCodeHashes.indexOf(h) >= 0) { dupes++; continue; }
-      var ok = importOneCode(lines[i], '', 'Remote');
-      if (ok) { c.importedCodeHashes.push(h); added++; }   // only remember codes that imported, so a bad one can retry
+      var rr = importOneCode(lines[i], '');
+      if (rr.ok) { c.importedCodeHashes.push(h); added++; }   // only remember codes that imported, so a bad one can retry
       else { failed++; }
     }
     save();
@@ -5029,22 +5054,26 @@ function showToast(msg) {
       return;
     }
     if (!c.importedResponseIds) c.importedResponseIds = [];
-    var added = 0, unreadable = 0, already = 0;
+    var added = 0, unreadable = 0, already = 0, reasons = {};
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       if (c.importedResponseIds.indexOf(row.id) >= 0) { already++; continue; }
-      var code = (row.payload && row.payload.code) ? String(row.payload.code) : '';
-      var ok = importOneCode(code, row.name || '', 'Remote');
-      if (ok) { c.importedResponseIds.push(row.id); added++; }
-      else { unreadable++; }   // don't mark as imported, so it can recover on a later pull
+      var rr = importOneCode(codeFromRow(row), row.name || '');
+      if (rr.ok) { c.importedResponseIds.push(row.id); added++; }
+      else { unreadable++; reasons[rr.reason] = (reasons[rr.reason] || 0) + 1; }   // don't mark imported -> recoverable
     }
     save();
     // Refresh the heatmap if it's showing, so the new people appear immediately.
     if (state.activeView === 'heatmap' && typeof renderHeatmap === 'function') renderHeatmap();
-    if (added) setS('✓ Pulled ' + added + ' new response' + (added > 1 ? 's' : '') + ' — open the 🔥 Results tab to see them.' + (unreadable ? (' ' + unreadable + ' couldn’t be read (their reactions didn’t match this cycle’s slides).') : ''));
-    else if (unreadable) setS(unreadable + ' response' + (unreadable > 1 ? 's' : '') + ' couldn’t be read — their reactions don’t match this cycle’s current slides. Did the slides change after you sent the link? (You can also paste their code below.)');
+    function reasonMsg() {
+      if (reasons.no_reactions) return 'they tapped through without actually reacting';
+      if (reasons.no_match) return 'their reactions didn’t line up with this cycle’s slides';
+      return 'the response data couldn’t be read';
+    }
+    if (added) setS('✓ Pulled ' + added + ' new response' + (added > 1 ? 's' : '') + ' — open the 🔥 Results tab to see them.' + (unreadable ? (' ' + unreadable + ' skipped (' + reasonMsg() + ').') : ''));
+    else if (unreadable) setS(unreadable + ' response' + (unreadable > 1 ? 's' : '') + ' couldn’t be imported — ' + reasonMsg() + '. (You can also paste their code in the box below.)');
     else setS(already ? ('No new responses (' + already + ' already imported).') : 'No responses yet.');
-    showToast(added ? ('Imported ' + added + ' response' + (added > 1 ? 's' : '')) : (unreadable ? (unreadable + ' couldn’t be read') : 'No new responses'));
+    showToast(added ? ('Imported ' + added + ' response' + (added > 1 ? 's' : '')) : (unreadable ? (unreadable + ' couldn’t be imported') : 'No new responses'));
   }
 
   function wireCollect(panel) {
