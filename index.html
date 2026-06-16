@@ -2043,7 +2043,9 @@ async function decodePayloadCompressed(s) {
    PARTICIPANT MODE DETECTION
    ============================================================ */
 const urlParams = new URLSearchParams(window.location.search);
-const participantMode = urlParams.get('view') === 'participant';
+// Participant mode is triggered by a short share link (?r=token) or the
+// legacy self-contained link (?view=participant&data=...).
+const participantMode = urlParams.get('view') === 'participant' || !!urlParams.get('r');
 
 if (participantMode) {
   document.body.classList.add('participant-mode');
@@ -2595,13 +2597,14 @@ document.getElementById('open-participant-view').addEventListener('click', () =>
   const targetPp = document.getElementById('share-pp-target').value;
   c.activeParticipantId = targetPp;
   save();
-  const newUrl = new URL(window.location.href);
-  newUrl.searchParams.set('view', 'participant');
-  newUrl.searchParams.set('pp', targetPp);
-  newUrl.searchParams.set('local', '1');
-  const lang = shareLang();
-  if (lang && lang !== 'en') newUrl.searchParams.set('lang', lang);
-  window.location.href = newUrl.toString();
+  // Open the reaction flow in-page (same tab, same data) instead of navigating
+  // to a separate URL. Reactions write straight into this participant's slot,
+  // and on finish we confirm and jump to Results — no dead-end "go back".
+  if (typeof window.openInPersonReaction === 'function') {
+    window.openInPersonReaction(targetPp);
+  } else {
+    showToast('Could not open the in-person view.');
+  }
 });
 
 function shareLang() {
@@ -3832,6 +3835,21 @@ setView(state.activeView || 'interview');
 
 maybeShowOnboarding();
 
+/* ---- Expose helpers needed by the end-of-file modules ----
+   These functions live inside initInterviewerMode's closure, so the separate
+   <script> modules (Share/collect + in-person overlay) can't see them by
+   default. Publishing them globally lets those modules call them — and fixes
+   the long-standing "response couldn't be imported" bug, which was actually a
+   ReferenceError on parseRxnInput/matchReactionsToCycle from the collect
+   module's scope. */
+window.setView = setView;
+window.renderHeatmap = renderHeatmap;
+window.renderParticipantSelect = renderParticipantSelect;
+window.parseRxnInput = parseRxnInput;
+window.matchReactionsToCycle = matchReactionsToCycle;
+window.buildParticipantUrl = buildParticipantUrl;
+window.shareLang = shareLang;
+
 } // end initInterviewerMode
 
 /* ============================================================
@@ -3843,18 +3861,47 @@ async function initParticipantMode() {
   const root = document.getElementById('participant-ui');
   const params = new URLSearchParams(window.location.search);
   const dataParam = params.get('data');
+  const shareToken = params.get('r');     // NEW: short-link token -> slides live in Supabase
   const localMode = params.get('local') === '1';
   const ppParam = params.get('pp');
-  const collectFid = params.get('fid');   // founder's user id, for auto-sync return
-  const collectCid = params.get('cid');   // cycle id this response belongs to
+  let collectFid = params.get('fid');     // founder's user id, for auto-sync return
+  let collectCid = params.get('cid');     // cycle id this response belongs to
   const langRaw = (params.get('lang') || 'en').toLowerCase();
-  const ppLang = PP_LANGS.indexOf(langRaw) !== -1 ? langRaw : 'en';
+  let ppLang = PP_LANGS.indexOf(langRaw) !== -1 ? langRaw : 'en';
   document.documentElement.lang = ppLang;
 
   let slides, cycleName = '', scoreMap = { ...DEFAULT_SCORE_MAP }, ppName = '';
   let targetParticipantId = null;
 
-  if (localMode) {
+  if (shareToken) {
+    // ---- SHORT LINK ----  Fetch the slides this token points at from Supabase.
+    root.innerHTML = '<div class="pp-translating"><div class="spin"></div>Loading…</div>';
+    if (typeof sb === 'undefined' || !sb) {
+      root.innerHTML = '<div class="pp-welcome"><h1>Needs internet</h1><p>This link loads the slides online. Please connect to the internet and reopen the link.</p></div>';
+      return;
+    }
+    let share = null;
+    try {
+      const r = await sb.from('mvs_shares').select('founder_id,cycle_key,payload').eq('token', shareToken).maybeSingle();
+      if (r.error) throw r.error;
+      share = r.data;
+    } catch (e) { share = null; }
+    if (!share || !share.payload) {
+      root.innerHTML = '<div class="pp-welcome"><h1>Link unavailable</h1><p>This invite link has expired or was mistyped. Please ask the person who sent it for a fresh link.</p></div>';
+      return;
+    }
+    const pl = share.payload || {};
+    slides = Array.isArray(pl.slides) ? JSON.parse(JSON.stringify(pl.slides)) : [];
+    cycleName = pl.cycleName || '';
+    if (pl.scoreMap) scoreMap = pl.scoreMap;
+    collectFid = share.founder_id || pl.founderId || '';
+    collectCid = share.cycle_key || pl.cycleKey || '';
+    if (pl.lang && PP_LANGS.indexOf(pl.lang) !== -1) { ppLang = pl.lang; document.documentElement.lang = ppLang; }
+    if (!slides.length) {
+      root.innerHTML = '<div class="pp-welcome"><h1>No slides yet</h1><p>The person who sent this hasn\'t added any slides. Ask them for a new link once they have.</p></div>';
+      return;
+    }
+  } else if (localMode) {
     // Same-device hand-off: the interviewer's data may be stored under a
     // signed-in (user-scoped) key. The participant page reboots without
     // signing in, so load that user's saved state before reading the cycle —
@@ -3902,9 +3949,14 @@ async function initParticipantMode() {
     try { slides = await translateSlidesContent(slides, ppLang); } catch (e) {}
   }
 
-  // Restore any partial in-progress reactions (per-link or per-localPpId)
+  // Restore any partial in-progress reactions. Each share token (or legacy
+  // sid) gets its OWN session bucket, so a brand-new link never resumes a
+  // previous person's run — no cookie-clearing needed.
   const sidParam = params.get('sid');
-  const sessionKey = PP_STORAGE_KEY + ':' + (localMode ? ('local-' + targetParticipantId) : ('link-' + (sidParam || dataParam.slice(0, 16)))) + (ppLang !== 'en' ? '-' + ppLang : '');
+  const sessionTag = shareToken ? ('r-' + shareToken)
+    : localMode ? ('local-' + targetParticipantId)
+    : ('link-' + (sidParam || (dataParam ? dataParam.slice(0, 16) : 'x')));
+  const sessionKey = PP_STORAGE_KEY + ':' + sessionTag + (ppLang !== 'en' ? '-' + ppLang : '');
   let ppState = (() => {
     try { return JSON.parse(localStorage.getItem(sessionKey)) || { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
     catch { return { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
@@ -4231,20 +4283,23 @@ async function initParticipantMode() {
     if (autoEligible && !ppState.autoSent) {
       (async () => {
         try {
+          // Store the reactions as a plain structured object (v2). The
+          // interviewer's "Pull" reads this directly — no code to decode,
+          // which removes the old "response couldn't be imported" failures.
           const ins = await sb.from('mvs_responses').insert({
             founder_id: collectFid,
             cycle_key: collectCid || '',
             name: ppState.name || '',
-            payload: { code: code, v: 2 }
+            payload: payload
           });
           if (ins && ins.error) throw ins.error;
           ppState.autoSent = true; ppSave();
           const el = document.getElementById('pp-auto-status');
-          if (el) { el.textContent = '✓ Sent automatically — you’re all done. You can close this page.'; el.classList.add('ok'); }
+          if (el) { el.textContent = '✓ Sent — you\'re all done. You can close this page.'; el.classList.add('ok'); }
           const mb = document.getElementById('pp-manual-block'); if (mb) mb.style.display = 'none';
         } catch (e) {
           const el = document.getElementById('pp-auto-status');
-          if (el) { el.textContent = '⚠ Couldn’t send automatically — please use one of the options below to send your code.'; el.classList.add('err'); }
+          if (el) { el.textContent = '⚠ Couldn\'t send automatically — please use one of the options below to send your code.'; el.classList.add('err'); }
         }
       })();
     }
@@ -4919,6 +4974,27 @@ function showToast(msg) {
   function codeHash(s) { var h = 0; for (var i = 0; i < s.length; i++) { h = (h * 31 + s.charCodeAt(i)) | 0; } return 'c' + (h >>> 0); }
 
   var SETUP_SQL = [
+    '-- Run this ONCE in your Supabase project (SQL Editor -> New query -> Run).',
+    '-- It creates two tables: short-link slides (mvs_shares) + responses (mvs_responses).',
+    '',
+    '-- 1) Slides behind each short link. Anyone with the link token can read it;',
+    '--    only signed-in interviewers can create one.',
+    'create table if not exists public.mvs_shares (',
+    '  token       text primary key,',
+    '  founder_id  uuid not null,',
+    '  cycle_key   text not null,',
+    '  payload     jsonb not null,',
+    '  created_at  timestamptz not null default now()',
+    ');',
+    'alter table public.mvs_shares enable row level security;',
+    'drop policy if exists mvs_shares_read on public.mvs_shares;',
+    'create policy mvs_shares_read on public.mvs_shares',
+    '  for select to anon, authenticated using (true);',
+    'drop policy if exists mvs_shares_insert on public.mvs_shares;',
+    'create policy mvs_shares_insert on public.mvs_shares',
+    '  for insert to authenticated with check (auth.uid() = founder_id);',
+    '',
+    '-- 2) Participant responses. Anyone can submit; each interviewer reads only theirs.',
     'create table if not exists public.mvs_responses (',
     '  id uuid primary key default gen_random_uuid(),',
     '  founder_id uuid not null,',
@@ -4942,6 +5018,45 @@ function showToast(msg) {
       + "Tap this and react to each line with ❤️, 👍 or 👎 (no right answers, no call needed):\n" + url;
   }
 
+  // Tracks how the most recent link was built, so the UI can explain it.
+  var lastShareMode = '';
+
+  // Short, unguessable token. Each "Generate" makes a brand-new one, so a new
+  // link is ALWAYS a fresh session — nothing carries over between people.
+  function makeShareToken() {
+    var a = 'abcdefghijkmnpqrstuvwxyz23456789'; // no look-alike chars
+    var s = '';
+    try {
+      var arr = new Uint8Array(10);
+      (window.crypto || window.msCrypto).getRandomValues(arr);
+      for (var i = 0; i < arr.length; i++) s += a[arr[i] % a.length];
+    } catch (e) {
+      s = '';
+      for (var j = 0; j < 10; j++) s += a[Math.floor(Math.random() * a.length)];
+    }
+    return s;
+  }
+
+  function shareOrigin() {
+    return String((typeof location !== 'undefined' && location.href) || '').split(/[?#]/)[0];
+  }
+
+  // Build the long, self-contained link (legacy fallback when the short-link
+  // table isn't set up yet). Slides are packed into the URL.
+  async function buildLongLink(c, lang) {
+    var base = '';
+    try { base = await buildParticipantUrl(); }
+    catch (e1) {
+      var data = encodePayload({ cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap });
+      base = shareOrigin() + '?view=participant&data=' + data
+        + '&sid=s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+    if (lang && lang !== 'en' && base.indexOf('lang=') === -1) base += '&lang=' + encodeURIComponent(lang);
+    var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'cid=' + encodeURIComponent(c.id);
+    if (typeof currentUserId !== 'undefined' && currentUserId) url += '&fid=' + encodeURIComponent(currentUserId);
+    return url;
+  }
+
   async function buildCollectUrl() {
     var c = activeCycle();
     if (!c) throw new Error('No active cycle to share.');
@@ -4950,24 +5065,53 @@ function showToast(msg) {
       return (s.headline && String(s.headline).trim()) || (Array.isArray(s.statements) && s.statements.some(function (st) { return st && st.text && String(st.text).trim(); }));
     });
     if (!hasContent) throw new Error('NO_SLIDES');
-    // Build the slides link. Reuse the app's encoder; fall back to the plain
-    // (uncompressed) encoder if that path throws in the user's browser.
-    var base = '';
-    try {
-      base = await buildParticipantUrl();
-    } catch (e1) {
+
+    var langSel = document.getElementById('pp-lang') || document.querySelector('#collect-lang');
+    var lang = (langSel && langSel.value) || 'en';
+
+    // Sharing requires sign-in so responses route back to the right account.
+    if (typeof currentUserId === 'undefined' || !currentUserId) throw new Error('NOT_SIGNED_IN');
+
+    // ---- Preferred: short link backed by Supabase ----
+    if (typeof sb !== 'undefined' && sb) {
+      var origin = shareOrigin();
+      if (!origin) throw new Error('ENCODE_FAILED:no page origin');
+      var token = makeShareToken();
+      var payload = {
+        cycleName: c.name,
+        slides: c.slides,
+        scoreMap: state.scoreMap,
+        lang: lang,
+        founderId: currentUserId,
+        cycleKey: c.id,
+        createdAt: Date.now()
+      };
       try {
-        var data = encodePayload({ cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap });
-        var origin = String((typeof location !== 'undefined' && location.href) || '').split(/[?#]/)[0];
-        if (!origin) throw new Error('no page origin');
-        base = origin + '?view=participant&data=' + data;
-      } catch (e2) { throw new Error('ENCODE_FAILED:' + (e1 && e1.message ? e1.message : e1)); }
+        var ins = await sb.from('mvs_shares').insert({
+          token: token,
+          founder_id: currentUserId,
+          cycle_key: c.id,
+          payload: payload
+        });
+        if (ins && ins.error) throw ins.error;
+        lastShareMode = 'short';
+        return origin + '?r=' + token;
+      } catch (e) {
+        // Table not created yet (or transient) — don't block the user; fall
+        // back to a long self-contained link that still auto-returns.
+        try {
+          var fb = await buildLongLink(c, lang);
+          lastShareMode = 'long';
+          return fb;
+        } catch (e2) {
+          throw new Error('SHARE_INSERT:' + (e && e.message ? e.message : e));
+        }
+      }
     }
-    if (!base || typeof base !== 'string') throw new Error('ENCODE_FAILED:empty link');
-    // Append cycle + founder ids by string (no new URL() — avoids origin/parse edge cases).
-    var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'cid=' + encodeURIComponent(c.id);
-    if (typeof currentUserId !== 'undefined' && currentUserId) url += '&fid=' + encodeURIComponent(currentUserId);
-    return url;
+
+    // ---- No cloud client at all: long link ----
+    lastShareMode = 'long';
+    return await buildLongLink(c, lang);
   }
 
   // A completed response becomes a participant: fill an empty slot (no name + no reactions)
@@ -5033,6 +5177,33 @@ function showToast(msg) {
     return { ok: true, reason: 'ok' };
   }
 
+  /* Land one stored response on a participant. Handles BOTH new structured
+     payloads (a plain {name,v:2,data} object — no decoding) and legacy rows
+     ({code:'RXN-…'} or a raw string). This is what removes the old
+     "response couldn't be imported" errors for valid responses. */
+  function importResponsePayload(pl, name) {
+    if (pl == null) return { ok: false, reason: 'empty' };
+    var parsed = null;
+    var isStructured = (typeof pl === 'object')
+      && !pl.code
+      && ((pl.v === 2 && Array.isArray(pl.data)) || (pl.reactions && typeof pl.reactions === 'object'));
+    if (isStructured) {
+      try { parsed = parseRxnInput(pl); } catch (e) { return { ok: false, reason: 'parse' }; }
+      if (countIncomingReactions(parsed) === 0) return { ok: false, reason: 'no_reactions' };
+      var c = activeCycle();
+      var result = matchReactionsToCycle(parsed, c);
+      if (!result || !result.applied || !result.applied.length) return { ok: false, reason: 'no_match' };
+      var p = createRemoteParticipant(c, name || parsed.name || '');
+      for (var i = 0; i < result.applied.length; i++) {
+        var m = result.applied[i];
+        c.reactions[rkey(p.id, m.slideId, m.stmtId)] = { reaction: m.reaction, phrases: '' };
+      }
+      return { ok: true, reason: 'ok' };
+    }
+    // Legacy code-based row.
+    return importOneCode(codeFromRow({ payload: pl }), name);
+  }
+
   function batchImportCodes(text) {
     var lines = String(text || '').split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
     var c = activeCycle();
@@ -5071,12 +5242,11 @@ function showToast(msg) {
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       if (c.importedResponseIds.indexOf(row.id) >= 0) { already++; continue; }
-      var theCode = codeFromRow(row);
-      var rr = importOneCode(theCode, row.name || '');
+      var rr = importResponsePayload(row.payload, row.name || '');
       if (rr.ok) { c.importedResponseIds.push(row.id); added++; }
       else {
         unreadable++; reasons[rr.reason] = (reasons[rr.reason] || 0) + 1;   // don't mark imported -> recoverable
-        try { console.warn('[Reactioner] response import failed — reason:', rr.reason, '| payload type:', (typeof (row.payload)), '| code length:', (theCode || '').length, '| code start:', (theCode || '').slice(0, 24)); } catch (e) {}
+        try { console.warn('[Reactioner] response import failed — reason:', rr.reason, '| payload type:', (typeof (row.payload))); } catch (e) {}
       }
     }
     save();
@@ -5109,16 +5279,23 @@ function showToast(msg) {
         var url = await buildCollectUrl();
         if (linkEl) linkEl.value = url;
         if (inviteEl) inviteEl.value = inviteText(url);
-        var signedIn = (typeof currentUserId !== 'undefined' && currentUserId);
         var local = (typeof location !== 'undefined' && location.protocol === 'file:');
-        if (statusEl) statusEl.textContent = local
-          ? '⚠ Link created, but it’s a file:// link — host the app so phones can open it, or use the paste-codes box for returns.'
-          : (signedIn ? 'Link ready — copy it or the invite below. Responses auto-sync; tap “Pull” to fetch them.' : 'Link ready. You’re not signed in, so responses come back as codes — paste them in the box below.');
+        if (statusEl) {
+          if (local) {
+            statusEl.textContent = '⚠ This is a file:// link — host the app (Cloudflare Pages) so phones can open it.';
+          } else if (lastShareMode === 'short') {
+            statusEl.textContent = '✓ Short link ready & copied. Each link is unique — send a fresh one to each person. Responses come back automatically; tap “Pull responses” to load them.';
+          } else {
+            statusEl.textContent = '✓ Link ready & copied (long-link mode — the short-link tables aren\'t set up yet; see “One-time setup” below). Responses still auto-return; tap “Pull responses”.';
+          }
+        }
         try { await navigator.clipboard.writeText(url); showToast('Link generated & copied'); } catch (e) { showToast('Link generated'); }
       } catch (e) {
         var msg = (e && e.message) ? e.message : String(e);
         var friendly;
         if (msg === 'NO_SLIDES') friendly = 'Add slides to this cycle first (✏️ Slides tab), then generate the link.';
+        else if (msg === 'NOT_SIGNED_IN') friendly = 'Sign in (top-right) before sharing — that\'s what lets responses come back to your results automatically.';
+        else if (msg.indexOf('SHARE_INSERT') === 0) friendly = 'Could not save the share link to the cloud. Open “One-time setup” below and run the SQL, then try again.';
         else if (msg.indexOf('ENCODE_FAILED') === 0) friendly = 'Could not build the link — encoding failed (' + msg.replace('ENCODE_FAILED:', '') + ').';
         else friendly = 'Could not generate link: ' + msg;
         if (statusEl) statusEl.textContent = friendly;
@@ -5130,14 +5307,13 @@ function showToast(msg) {
     if (cl) cl.addEventListener('click', function () { if (!linkEl.value) { showToast('Generate the link first'); return; } navigator.clipboard.writeText(linkEl.value).then(function () { showToast('Link copied'); }, function () { showToast('Select & copy manually'); }); });
     var ci = panel.querySelector('#collect-copy-invite');
     if (ci) ci.addEventListener('click', function () { if (!inviteEl.value) { showToast('Generate the link first'); return; } navigator.clipboard.writeText(inviteEl.value).then(function () { showToast('Invite copied'); }, function () { showToast('Select & copy manually'); }); });
-    // In-person hand-off: reuse the existing (now-hidden) control + its handler
+    // In-person hand-off: open the reaction flow as an in-page overlay (no
+    // navigation), so reactions save live and we can confirm + jump to Results.
     var ho = panel.querySelector('#collect-handover');
     if (ho) ho.addEventListener('click', function () {
       var slot = panel.querySelector('#collect-pp-target');
-      var legacy = document.getElementById('share-pp-target');
-      var open = document.getElementById('open-participant-view');
-      if (legacy && slot && slot.value) legacy.value = slot.value;
-      if (open) open.click(); else showToast('In-person hand-off is unavailable here.');
+      if (typeof window.openInPersonReaction === 'function') window.openInPersonReaction(slot ? slot.value : null);
+      else showToast('In-person hand-off is unavailable here.');
     });
     // Offline file: reuse the existing standalone generator
     var dl = panel.querySelector('#collect-download');
@@ -5180,7 +5356,7 @@ function showToast(msg) {
         + '<div class="collect-actions"><button class="btn tiny" id="collect-copy-invite">📋 Copy invite</button></div></div>'
       + '<div class="collect-row"><span class="collect-label">Or hand someone your device (in person)</span>'
         + '<div class="collect-actions"><select id="collect-pp-target">' + ppOpts + '</select><button class="btn tiny primary" id="collect-handover">Hand it over →</button></div>'
-        + '<div class="collect-sub" style="margin-top:4px">Their reactions save to the chosen slot automatically. Tap your browser’s Back button when they’re done.</div></div>'
+        + '<div class="collect-sub" style="margin-top:4px">Opens full-screen on this device. Their reactions save to the chosen slot as they tap. When they finish, you get a confirmation and a one-tap jump to Results — no Back button needed.</div></div>'
       + '<div class="collect-row"><span class="collect-label">Bring responses into the heatmap</span>'
         + '<div class="collect-actions"><button class="btn tiny primary" id="collect-pull">↻ Pull responses (automatic)</button></div>'
         + '<div class="collect-status" id="collect-pull-status">' + (signedIn ? 'Tap “Pull” to fetch anyone who has finished.' : 'Sign in (top-right) to enable automatic pull — or paste codes below.') + '</div>'
@@ -5195,6 +5371,213 @@ function showToast(msg) {
     wireCollect(panel);
   }
   window.renderCollectPanel = renderCollectPanel;
+})();
+</script>
+
+<script>
+/* ============================================================
+   IN-PERSON HAND-OVER  (same-page overlay, no navigation)
+   ------------------------------------------------------------
+   The interviewer hands their device to someone sitting with
+   them. The reaction flow opens as a full-screen overlay in the
+   SAME page (same JS, same live data), so every tap writes
+   straight into the chosen participant's slot and saves through
+   the normal cloud-sync path. On finish we confirm and jump to
+   the Results heatmap — the old "go back" dead-end is gone.
+   ============================================================ */
+(function () {
+  var EMO = { love: '❤️', like: '👍', dislike: '👎' };
+  var LBL = { headline: 'Headline', quote: 'Pain quote', promise: 'Promise', feature: 'Feature', price: 'Price', statement: 'Statement' };
+  function esc(s) { return (typeof escapeHtml === 'function') ? escapeHtml(s) : String(s == null ? '' : s); }
+  function toast(m) { if (typeof showToast === 'function') showToast(m); }
+
+  (function injectCss() {
+    var css =
+      '#inperson-overlay{position:fixed;inset:0;z-index:1200;background:var(--bg,#f4f5f7);overflow-y:auto;-webkit-overflow-scrolling:touch}'
+      + '#inperson-overlay .ip-top{position:sticky;top:0;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 16px;background:var(--panel,#fff);border-bottom:1px solid var(--border,#e3e6ea);z-index:2}'
+      + '#inperson-overlay .ip-title{font-weight:700;font-size:15px;color:var(--text,#1b1d22);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+      + '#inperson-overlay .ip-x{border:1px solid var(--border,#e3e6ea);background:var(--surface,#fff);color:var(--text,#1b1d22);min-width:34px;height:34px;border-radius:8px;cursor:pointer;font-size:15px;flex-shrink:0;padding:0 10px}'
+      + '#inperson-overlay .ip-body{max-width:860px;margin:0 auto;padding:20px 16px 90px}';
+    var st = document.createElement('style'); st.textContent = css; document.head.appendChild(st);
+  })();
+
+  function ensureOverlay() {
+    var o = document.getElementById('inperson-overlay');
+    if (o) o.remove();
+    o = document.createElement('div');
+    o.id = 'inperson-overlay';
+    o.setAttribute('role', 'dialog');
+    o.setAttribute('aria-modal', 'true');
+    document.body.appendChild(o);
+    document.body.style.overflow = 'hidden';
+    return o;
+  }
+  function closeOverlay() {
+    var o = document.getElementById('inperson-overlay');
+    if (o) o.remove();
+    document.body.style.overflow = '';
+  }
+
+  window.openInPersonReaction = function (pid) {
+    var c = (typeof activeCycle === 'function') ? activeCycle() : null;
+    if (!c) { toast('No active cycle'); return; }
+    if (!c.slides || !c.slides.length) { toast('Add slides first (✏️ Slides tab)'); return; }
+    if (!c.participants || !c.participants.length) {
+      c.participants = c.participants || [];
+      c.participants.push({ id: uid(), label: 'P1', name: '' });
+    }
+    pid = pid || c.activeParticipantId || (c.participants[0] && c.participants[0].id);
+    var p = c.participants.find(function (x) { return x.id === pid; });
+    if (!p) { p = c.participants[0]; pid = p.id; }
+    c.activeParticipantId = pid;
+    if (typeof save === 'function') save();
+
+    function keyFor(slideId, stId) { return rkey(pid, slideId, stId); }
+    function getR(slideId, stId) { var v = c.reactions[keyFor(slideId, stId)]; return v && v.reaction ? v.reaction : null; }
+    function setR(slideId, stId, val) {
+      var k = keyFor(slideId, stId);
+      var cur = c.reactions[k] || {};
+      cur.reaction = val || null;
+      c.reactions[k] = cur;
+      if (typeof save === 'function') save();   // live save through normal cloud-sync path
+    }
+
+    var overlay = ensureOverlay();
+    var idx = -1; // -1 welcome, 0..n-1 slides, n done
+
+    function header() {
+      return '<div class="ip-top"><div class="ip-title">' + esc(c.name || 'Reactioner') + '</div>'
+        + '<button class="ip-x" id="ip-close" aria-label="Close">✕ Close</button></div>';
+    }
+    function wireClose() {
+      var x = overlay.querySelector('#ip-close');
+      if (x) x.addEventListener('click', function () {
+        closeOverlay();
+        if (typeof renderParticipantSelect === 'function') renderParticipantSelect();
+        if (typeof state !== 'undefined' && state.activeView === 'heatmap' && typeof renderHeatmap === 'function') renderHeatmap();
+      });
+    }
+
+    function render() {
+      if (idx < 0) return renderWelcome();
+      if (idx >= c.slides.length) return renderDone();
+      return renderSlide(idx);
+    }
+
+    function renderWelcome() {
+      overlay.innerHTML = header()
+        + '<div class="ip-body"><div class="pp-welcome">'
+        + '<h1>Hi! 👋 Thanks for helping out.</h1>'
+        + '<p>Read each line and tap one emoji: <strong>❤️</strong> love it, <strong>👍</strong> like it, <strong>👎</strong> not for me. Skip anything you don\'t have an opinion on — there are no wrong answers. Takes about 3 minutes.</p>'
+        + '<input type="text" id="ip-name" placeholder="Your name (optional)" value="' + esc(p.name || '') + '" />'
+        + '<div><button class="btn primary" id="ip-start" style="font-size:17px;padding:14px 32px;border-radius:10px">Start →</button></div>'
+        + (c.name ? '<p style="margin-top:18px;font-size:12px;color:var(--muted)">Topic: ' + esc(c.name) + '</p>' : '')
+        + '</div></div>';
+      wireClose();
+      overlay.querySelector('#ip-name').addEventListener('input', function (e) { p.name = e.target.value; if (typeof save === 'function') save(); });
+      overlay.querySelector('#ip-start').addEventListener('click', function () { idx = 0; render(); overlay.scrollTo({ top: 0 }); });
+    }
+
+    function stmtRow(slide, item) {
+      var r = getR(slide.id, item.key);
+      function b(val) { return '<button class="' + val + (r === val ? ' active' : '') + '" data-sid="' + esc(slide.id) + '" data-stk="' + esc(item.key) + '" data-val="' + val + '" aria-label="' + val + '">' + EMO[val] + '</button>'; }
+      return '<div class="pp-stmt ' + (r ? 'has-reaction' : '') + '">'
+        + '<div class="pp-stmt-head"><span class="pp-stmt-label">' + esc(item.label) + '</span></div>'
+        + '<div class="pp-stmt-text is-' + esc(item.type) + '">' + esc(item.text) + '</div>'
+        + '<div class="pp-rxn">' + b('love') + b('like') + b('dislike') + '</div></div>';
+    }
+
+    function itemsForSlide(slide) {
+      var items = [{ key: 'headline', type: 'headline', text: slide.headline, label: LBL.headline }];
+      var fnum = 0;
+      (slide.statements || []).forEach(function (st) {
+        if (!st.text || !st.text.trim()) return;
+        if (st.type === 'feature') fnum++;
+        items.push({
+          key: st.id,
+          type: st.type || 'statement',
+          text: st.text,
+          label: (st.type === 'feature' && fnum) ? (LBL.feature + ' ' + fnum) : (LBL[st.type] || LBL.statement)
+        });
+      });
+      return items;
+    }
+
+    function renderSlide(i) {
+      var slide = c.slides[i];
+      var dots = '';
+      for (var d = 0; d < c.slides.length; d++) dots += '<span class="pp-dot ' + (d === i ? 'active' : (d < i ? 'done' : '')) + '"></span>';
+      var rows = itemsForSlide(slide).map(function (it) { return stmtRow(slide, it); }).join('');
+      var last = (i === c.slides.length - 1);
+      overlay.innerHTML = header()
+        + '<div class="ip-body">'
+        + '<div class="pp-progress"><span>Slide ' + (i + 1) + ' of ' + c.slides.length + '</span><div class="pp-dots">' + dots + '</div></div>'
+        + '<div class="pp-slide" style="--slide-accent:' + esc(slide.color || '#888') + '"><h2>' + esc(slide.headline) + '</h2>' + rows + '</div>'
+        + '<div class="pp-nav"><button id="ip-prev" ' + (i === 0 ? 'disabled' : '') + '>← Previous</button>'
+        + '<button class="primary" id="ip-next">' + (last ? 'Done →' : 'Next slide →') + '</button></div>'
+        + '</div>';
+      wireClose();
+      overlay.querySelectorAll('.pp-rxn button').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var sid = btn.getAttribute('data-sid'), stk = btn.getAttribute('data-stk'), val = btn.getAttribute('data-val');
+          setR(sid, stk, getR(sid, stk) === val ? null : val);
+          render();
+        });
+      });
+      overlay.querySelector('#ip-prev').addEventListener('click', function () { if (idx > 0) { idx--; render(); overlay.scrollTo({ top: 0 }); } });
+      overlay.querySelector('#ip-next').addEventListener('click', function () { idx++; render(); overlay.scrollTo({ top: 0 }); });
+    }
+
+    function renderDone() {
+      if (typeof save === 'function') save();
+      var counts = { love: 0, like: 0, dislike: 0 }, total = 0;
+      Object.keys(c.reactions).forEach(function (k) {
+        if (k.indexOf(pid + '|') === 0) {
+          var rr = c.reactions[k] && c.reactions[k].reaction;
+          if (rr && counts[rr] != null) { counts[rr]++; total++; }
+        }
+      });
+      overlay.innerHTML = header()
+        + '<div class="ip-body"><div class="pp-done-screen">'
+        + '<h2>✓ Saved' + (p.name ? ' — ' + esc(p.name) : '') + '!</h2>'
+        + '<p style="color:var(--muted)">' + total + ' reaction' + (total === 1 ? '' : 's') + ' recorded in slot <strong>' + esc(p.label) + '</strong>.</p>'
+        + '<div style="font-size:24px;margin:12px 0">'
+        + (counts.love ? '❤️ ' + counts.love + '&nbsp;&nbsp;' : '')
+        + (counts.like ? '👍 ' + counts.like + '&nbsp;&nbsp;' : '')
+        + (counts.dislike ? '👎 ' + counts.dislike : '')
+        + '</div>'
+        + '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px">'
+        + '<button class="btn primary" id="ip-results" style="font-size:16px;padding:13px 22px">See results →</button>'
+        + '<button class="btn" id="ip-again">Change a reaction</button>'
+        + '<button class="btn" id="ip-next-person">Hand to next person →</button>'
+        + '</div></div></div>';
+      wireClose();
+      overlay.querySelector('#ip-results').addEventListener('click', function () {
+        closeOverlay();
+        if (typeof renderParticipantSelect === 'function') renderParticipantSelect();
+        if (typeof setView === 'function') setView('heatmap');
+        if (typeof renderHeatmap === 'function') renderHeatmap();
+        toast('Saved to ' + (p.label || 'slot') + ' — shown in Results');
+      });
+      overlay.querySelector('#ip-again').addEventListener('click', function () { idx = c.slides.length - 1; render(); overlay.scrollTo({ top: 0 }); });
+      overlay.querySelector('#ip-next-person').addEventListener('click', function () {
+        // Pick the next empty slot, or make a fresh one, then restart the flow.
+        var next = c.participants.find(function (x) {
+          if (x.id === pid) return false;
+          var has = Object.keys(c.reactions).some(function (k) { return k.indexOf(x.id + '|') === 0 && c.reactions[k] && c.reactions[k].reaction; });
+          return !(x.name && x.name.trim()) && !has;
+        });
+        if (!next) { next = { id: uid(), label: 'P' + (c.participants.length + 1), name: '' }; c.participants.push(next); }
+        c.activeParticipantId = next.id;
+        if (typeof save === 'function') save();
+        if (typeof renderParticipantSelect === 'function') renderParticipantSelect();
+        closeOverlay();
+        window.openInPersonReaction(next.id);
+      });
+    }
+
+    render();
+  };
 })();
 </script>
 </body>
