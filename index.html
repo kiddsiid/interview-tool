@@ -1806,7 +1806,13 @@ async function refreshFromCloud() {
     const row = await cloudLoad(currentUserId);
     if (row && row.updated_at && row.updated_at !== cloudUpdatedAt
         && row.data && row.data.cycles && row.data.cycles.length) {
+      // The tab and cycle you're currently looking at are UI choices, not data to sync —
+      // preserve them so a background refresh never bounces you off your current tab.
+      const keepView = (state && state.activeView) ? state.activeView : null;
+      const keepCycle = (state && state.activeCycleId) ? state.activeCycleId : null;
       state = row.data;
+      if (keepView) state.activeView = keepView;
+      if (keepCycle && state.cycles.some(function (cc) { return cc.id === keepCycle; })) state.activeCycleId = keepCycle;
       cloudUpdatedAt = row.updated_at;
       try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) {}
       if (typeof rerenderInterviewer === 'function') rerenderInterviewer();
@@ -4951,12 +4957,21 @@ function showToast(msg) {
     return url;
   }
 
-  function createRemoteParticipant(c, name, labelPrefix) {
+  // A completed response becomes a participant: fill an empty slot (no name + no reactions)
+  // with this person's name, or add a new participant named after them.
+  function createRemoteParticipant(c, name) {
     if (!c.participants) c.participants = [];
-    var prefix = labelPrefix || 'Remote';
-    var n = 0;
-    for (var i = 0; i < c.participants.length; i++) { if (String(c.participants[i].label || '').indexOf(prefix) === 0) n++; }
-    var p = { id: uid(), label: prefix + ' ' + (n + 1), name: name || '' };
+    name = (name || '').trim();
+    var reactions = c.reactions || {};
+    for (var i = 0; i < c.participants.length; i++) {
+      var ep = c.participants[i];
+      if (ep.name && String(ep.name).trim()) continue; // slot already belongs to someone
+      var hasReactions = Object.keys(reactions).some(function (k) { return k.indexOf(ep.id + '|') === 0 && reactions[k] && reactions[k].reaction; });
+      if (hasReactions) continue;                       // slot already has reactions
+      if (name) ep.name = name;                         // fill this open slot with their name
+      return ep;
+    }
+    var p = { id: uid(), label: 'P' + (c.participants.length + 1), name: name };
     c.participants.push(p);
     return p;
   }
@@ -4991,8 +5006,8 @@ function showToast(msg) {
       var h = codeHash(normd);
       if (c.importedCodeHashes.indexOf(h) >= 0) { dupes++; continue; }
       var ok = importOneCode(lines[i], '', 'Remote');
-      c.importedCodeHashes.push(h);
-      if (ok) added++; else failed++;
+      if (ok) { c.importedCodeHashes.push(h); added++; }   // only remember codes that imported, so a bad one can retry
+      else { failed++; }
     }
     save();
     return { added: added, dupes: dupes, failed: failed };
@@ -5014,20 +5029,22 @@ function showToast(msg) {
       return;
     }
     if (!c.importedResponseIds) c.importedResponseIds = [];
-    var added = 0, unreadable = 0;
+    var added = 0, unreadable = 0, already = 0;
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
-      if (c.importedResponseIds.indexOf(row.id) >= 0) continue;
+      if (c.importedResponseIds.indexOf(row.id) >= 0) { already++; continue; }
       var code = (row.payload && row.payload.code) ? String(row.payload.code) : '';
       var ok = importOneCode(code, row.name || '', 'Remote');
-      c.importedResponseIds.push(row.id);
-      if (ok) added++; else unreadable++;
+      if (ok) { c.importedResponseIds.push(row.id); added++; }
+      else { unreadable++; }   // don't mark as imported, so it can recover on a later pull
     }
     save();
+    // Refresh the heatmap if it's showing, so the new people appear immediately.
     if (state.activeView === 'heatmap' && typeof renderHeatmap === 'function') renderHeatmap();
-    if (added) setS('✓ Pulled ' + added + ' new response' + (added > 1 ? 's' : '') + ' into this cycle’s heatmap.' + (unreadable ? (' ' + unreadable + ' could not be read.') : ''));
-    else setS(rows.length ? ('No new responses (all ' + rows.length + ' already imported).') : 'No responses yet.');
-    showToast(added ? ('Imported ' + added + ' remote response' + (added > 1 ? 's' : '')) : 'No new responses');
+    if (added) setS('✓ Pulled ' + added + ' new response' + (added > 1 ? 's' : '') + ' — open the 🔥 Results tab to see them.' + (unreadable ? (' ' + unreadable + ' couldn’t be read (their reactions didn’t match this cycle’s slides).') : ''));
+    else if (unreadable) setS(unreadable + ' response' + (unreadable > 1 ? 's' : '') + ' couldn’t be read — their reactions don’t match this cycle’s current slides. Did the slides change after you sent the link? (You can also paste their code below.)');
+    else setS(already ? ('No new responses (' + already + ' already imported).') : 'No responses yet.');
+    showToast(added ? ('Imported ' + added + ' response' + (added > 1 ? 's' : '')) : (unreadable ? (unreadable + ' couldn’t be read') : 'No new responses'));
   }
 
   function wireCollect(panel) {
