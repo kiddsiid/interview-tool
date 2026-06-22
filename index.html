@@ -905,6 +905,34 @@
   .hm-sum-card ol { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.6; color: var(--text); }
   .hm-sum-card .muted-empty { color: var(--muted); font-size: 13px; }
   .hm-sum-meta { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  #commitment-results { margin-top: 16px; }
+  .commitment-results-card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--panel);
+    box-shadow: var(--shadow-sm);
+    padding: 14px 16px;
+  }
+  .commitment-results-card h4 { margin: 0 0 8px; font-size: 13px; color: var(--accent); }
+  .commitment-results-grid { display: grid; grid-template-columns: 180px 1fr; gap: 8px 12px; font-size: 13px; line-height: 1.45; }
+  .commitment-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 9px; font-size: 12px; font-weight: 700; }
+  .commitment-pill.yes { background: var(--like-bg); color: var(--like-c); }
+  .commitment-pill.no { background: var(--dis-bg); color: var(--dis-c); }
+  .commitment-option-list { display: grid; gap: 8px; margin: 14px 0; }
+  .commitment-option-list button {
+    width: 100%;
+    text-align: left;
+    justify-content: flex-start;
+    white-space: normal;
+    line-height: 1.35;
+  }
+  .commitment-option-list button.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .commitment-choice-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0 6px; }
+  .commitment-choice-row button.active.yes { background: var(--like-bg); color: var(--like-c); border-color: var(--like-c); }
+  .commitment-choice-row button.active.no { background: var(--dis-bg); color: var(--dis-c); border-color: var(--dis-c); }
+  .commitment-config-grid { display: grid; gap: 10px; }
+  .commitment-config-grid textarea { min-height: 86px; resize: vertical; }
+  @media (max-width: 720px) { .commitment-results-grid, .commitment-choice-row { grid-template-columns: 1fr; } }
   @media (max-width: 720px) { .hm-summary-grid { grid-template-columns: 1fr; } }
 
   /* ---------- Edit slides ---------- */
@@ -1093,6 +1121,7 @@
       <select id="cycle-select"></select>
       <button class="btn tiny" id="add-cycle">+ New cycle</button>
       <button class="btn tiny" id="rename-cycle">Rename</button>
+      <button class="btn tiny" id="commitment-cycle">Commitment: Off</button>
       <button class="btn tiny danger" id="delete-cycle">Delete</button>
       <button class="btn tiny theme-toggle" id="theme-toggle" title="Toggle dark / light mode" aria-label="Toggle dark mode">🌙</button>
       <button class="btn tiny scheme-toggle" id="scheme-toggle" title="Switch dark color scheme (Green / Midnight)" aria-label="Switch dark color scheme">🌿 Green</button>
@@ -1184,6 +1213,7 @@
         <table class="heatmap" id="heatmap-table"></table>
       </div>
       <div class="legend" id="heatmap-legend"></div>
+      <div id="commitment-results"></div>
       <div class="print-notes" id="print-notes"></div>
     </div>
   </div>
@@ -1772,9 +1802,10 @@ async function loadUserState(uid) {
   try {
     const row = await cloudLoad(uid);
     if (row && row.data && row.data.cycles && row.data.cycles.length) {
-      state = row.data;
+      state = normalizeStateShape(row.data);
       cloudUpdatedAt = row.updated_at;
       try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) {}
+      rememberSavedState();
       return;
     }
     /* No row yet: first time this account is used. */
@@ -1788,13 +1819,15 @@ async function loadUserState(uid) {
       } catch (e) {}
       try { localStorage.setItem('vit-migrated-' + uid, '1'); } catch (e) {}
     }
-    state = seed;
+    state = normalizeStateShape(seed);
     try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) {}
     await cloudUpsert(uid, state);
+    rememberSavedState();
   } catch (e) {
     console.warn('cloud load failed, using local copy', e);
     const cached = readLocalCache(uid);
-    if (cached) state = cached;
+    if (cached) state = normalizeStateShape(cached);
+    rememberSavedState();
     setSyncStatus('err', 'Offline — using local copy');
   }
 }
@@ -1810,11 +1843,12 @@ async function refreshFromCloud() {
       // preserve them so a background refresh never bounces you off your current tab.
       const keepView = (state && state.activeView) ? state.activeView : null;
       const keepCycle = (state && state.activeCycleId) ? state.activeCycleId : null;
-      state = row.data;
+      state = normalizeStateShape(row.data);
       if (keepView) state.activeView = keepView;
       if (keepCycle && state.cycles.some(function (cc) { return cc.id === keepCycle; })) state.activeCycleId = keepCycle;
       cloudUpdatedAt = row.updated_at;
       try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) {}
+      rememberSavedState();
       if (typeof rerenderInterviewer === 'function') rerenderInterviewer();
       setSyncStatus('ok', 'Synced — updated');
     }
@@ -1918,8 +1952,85 @@ const STATEMENT_HINTS = {
 };
 
 const STATEMENT_TEST_ORDER = { quote: 10, promise: 20, feature: 30, custom: 40, price: 50 };
+const DEFAULT_COMMITMENT_YES_OPTIONS = [
+  'I would buy it or sign up now',
+  'I want a demo or trial',
+  'I would share this with someone else',
+  'I need one small thing clarified first'
+];
+const DEFAULT_COMMITMENT_NO_OPTIONS = [
+  'The price is too high',
+  'This is not urgent enough',
+  'It is missing something I need',
+  'I do not trust it yet',
+  'This is not for me'
+];
 
 function uid() { return 'id-' + Math.random().toString(36).slice(2, 10); }
+function cleanOptionList(list, fallback) {
+  const source = Array.isArray(list) ? list : fallback;
+  const cleaned = source.map(x => String(x || '').trim()).filter(Boolean);
+  return cleaned.length ? cleaned : fallback.slice();
+}
+function defaultCommitmentTest() {
+  return {
+    enabled: false,
+    question: 'After seeing this, would you commit to trying it or taking the next step?',
+    yesOptions: DEFAULT_COMMITMENT_YES_OPTIONS.slice(),
+    noOptions: DEFAULT_COMMITMENT_NO_OPTIONS.slice()
+  };
+}
+function normalizeCommitmentTest(test) {
+  const d = defaultCommitmentTest();
+  if (!test || typeof test !== 'object') return d;
+  return {
+    enabled: !!test.enabled,
+    question: String(test.question || d.question).trim() || d.question,
+    yesOptions: cleanOptionList(test.yesOptions, d.yesOptions),
+    noOptions: cleanOptionList(test.noOptions, d.noOptions)
+  };
+}
+function normalizeCycleShape(c) {
+  if (!c || typeof c !== 'object') return c;
+  c.commitmentTest = normalizeCommitmentTest(c.commitmentTest);
+  if (!c.commitments || typeof c.commitments !== 'object' || Array.isArray(c.commitments)) c.commitments = {};
+  return c;
+}
+function normalizeStateShape(s) {
+  if (s && Array.isArray(s.cycles)) s.cycles.forEach(normalizeCycleShape);
+  return s;
+}
+function cycleCommitmentTest(c) {
+  normalizeCycleShape(c);
+  return c.commitmentTest;
+}
+function publicCommitmentTest(c) {
+  const test = cycleCommitmentTest(c);
+  return {
+    enabled: !!test.enabled,
+    question: test.question,
+    yesOptions: test.yesOptions.slice(),
+    noOptions: test.noOptions.slice()
+  };
+}
+function hasCommitmentAnswer(answer) {
+  return !!(answer && (answer.answer === 'yes' || answer.answer === 'no') && String(answer.reason || '').trim());
+}
+function formatCommitmentAnswer(answer) {
+  if (!hasCommitmentAnswer(answer)) return '';
+  return (answer.answer === 'yes' ? 'Yes' : 'No') + ' - ' + String(answer.reason || '').trim();
+}
+function applyCommitmentAnswer(c, participantId, answer) {
+  if (!c || !participantId || !hasCommitmentAnswer(answer)) return false;
+  normalizeCycleShape(c);
+  c.commitments[participantId] = {
+    answer: answer.answer,
+    reason: String(answer.reason || '').trim(),
+    question: answer.question || cycleCommitmentTest(c).question,
+    updatedAt: answer.updatedAt || new Date().toISOString()
+  };
+  return true;
+}
 
 /* New accounts start with no demo slides — users add their own or
    import them from a PDF/PPTX template. */
@@ -1951,6 +2062,8 @@ function defaultCycle(name) {
     slides: defaultSlides(),
     participants: defaultParticipants(),
     reactions: {},
+    commitments: {},
+    commitmentTest: defaultCommitmentTest(),
     activeSlideId: null,
     activeParticipantId: null
   };
@@ -1973,18 +2086,27 @@ function loadLocalState() {
     const raw = localStorage.getItem(localCacheKey());
     const s = raw ? JSON.parse(raw) : defaultState();
     if (!s || !s.cycles || s.cycles.length === 0) return defaultState();
-    return s;
+    return normalizeStateShape(s);
   } catch (e) { return defaultState(); }
 }
 
 let state = loadLocalState();
+let lastSavedStateJson = '';
+function rememberSavedState() {
+  try { lastSavedStateJson = JSON.stringify(state); } catch (e) { lastSavedStateJson = ''; }
+}
+rememberSavedState();
 
 function save() {
-  try { localStorage.setItem(localCacheKey(), JSON.stringify(state)); } catch (e) { console.warn('save failed', e); }
+  let json;
+  try { json = JSON.stringify(state); } catch (e) { console.warn('save failed', e); return; }
+  if (json === lastSavedStateJson) return;
+  try { localStorage.setItem(localCacheKey(), json); } catch (e) { console.warn('save failed', e); }
+  lastSavedStateJson = json;
   scheduleCloudSave();
 }
 
-function activeCycle() { return state.cycles.find(c => c.id === state.activeCycleId) || state.cycles[0]; }
+function activeCycle() { return normalizeCycleShape(state.cycles.find(c => c.id === state.activeCycleId) || state.cycles[0]); }
 function rkey(pId, sId, stId) { return `${pId}|${sId}|${stId}`; }
 
 /* ============================================================
@@ -2087,6 +2209,7 @@ function reactionEmoji(rxn) { return rxn === 'love' ? '❤️' : rxn === 'like' 
 const views = ['interview', 'heatmap', 'share', 'edit', 'participants', 'vp', 'settings'];
 function setView(v) {
   state.activeView = v; save();
+  renderCommitmentCycleButton();
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
   views.forEach(name => {
     const el = document.getElementById('view-' + name);
@@ -2104,9 +2227,69 @@ function setView(v) {
 document.querySelectorAll('.tab').forEach(t => t.addEventListener('click', () => setView(t.dataset.view)));
 
 function renderCycleSelect() {
+  state.cycles.forEach(normalizeCycleShape);
   cycleSelect.innerHTML = state.cycles.map(c => `<option value="${c.id}" ${c.id === state.activeCycleId ? 'selected' : ''}>${escapeHtml(c.name)}</option>`).join('');
+  renderCommitmentCycleButton();
+}
+function renderCommitmentCycleButton() {
+  const btn = document.getElementById('commitment-cycle');
+  if (!btn) return;
+  const test = cycleCommitmentTest(activeCycle());
+  btn.textContent = test.enabled ? 'Commitment: On' : 'Commitment: Off';
+  btn.classList.toggle('primary', !!test.enabled);
+  btn.title = test.enabled ? 'Commitment test is enabled for this cycle' : 'Enable a final Yes/No commitment question for this cycle';
+}
+function optionsToText(options) {
+  return cleanOptionList(options, []).join('\n');
+}
+function textToOptions(text, fallback) {
+  return cleanOptionList(String(text || '').split(/\r?\n/), fallback);
+}
+function openCommitmentSettings() {
+  const c = activeCycle();
+  const test = cycleCommitmentTest(c);
+  showModal(`<h3 style="margin-top:0">Commitment test</h3>
+    <p style="color:var(--muted);font-size:13px;line-height:1.5;margin-top:0">When enabled, participants answer one final Yes/No commitment question after the last slide and choose why. Their answer appears at the end of Results.</p>
+    <div class="commitment-config-grid">
+      <label style="display:flex;gap:8px;align-items:center;font-weight:700">
+        <input type="checkbox" id="commitment-enabled" ${test.enabled ? 'checked' : ''} style="width:auto" />
+        Ask commitment test at the end of this cycle
+      </label>
+      <div>
+        <label class="field-label">Question</label>
+        <input type="text" id="commitment-question" value="${escapeHtml(test.question)}" style="width:100%" />
+      </div>
+      <div>
+        <label class="field-label">Yes reasons (one per line)</label>
+        <textarea id="commitment-yes-options">${escapeHtml(optionsToText(test.yesOptions))}</textarea>
+      </div>
+      <div>
+        <label class="field-label">No reasons (one per line)</label>
+        <textarea id="commitment-no-options">${escapeHtml(optionsToText(test.noOptions))}</textarea>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">
+      <button class="btn" id="commitment-cancel">Cancel</button>
+      <button class="btn primary" id="commitment-save">Save commitment test</button>
+    </div>`);
+  document.getElementById('commitment-cancel').addEventListener('click', closeModal);
+  document.getElementById('commitment-save').addEventListener('click', () => {
+    c.commitmentTest = {
+      enabled: document.getElementById('commitment-enabled').checked,
+      question: document.getElementById('commitment-question').value.trim() || defaultCommitmentTest().question,
+      yesOptions: textToOptions(document.getElementById('commitment-yes-options').value, DEFAULT_COMMITMENT_YES_OPTIONS),
+      noOptions: textToOptions(document.getElementById('commitment-no-options').value, DEFAULT_COMMITMENT_NO_OPTIONS)
+    };
+    normalizeCycleShape(c);
+    save();
+    closeModal();
+    renderCommitmentCycleButton();
+    if (state.activeView === 'heatmap') renderHeatmap();
+    showToast(c.commitmentTest.enabled ? 'Commitment test enabled' : 'Commitment test disabled');
+  });
 }
 cycleSelect.addEventListener('change', () => { state.activeCycleId = cycleSelect.value; save(); setView(state.activeView); });
+document.getElementById('commitment-cycle').addEventListener('click', openCommitmentSettings);
 document.getElementById('add-cycle').addEventListener('click', () => {
   const name = prompt('New cycle name?', `Cycle ${state.cycles.length + 1}`);
   if (!name) return;
@@ -2355,6 +2538,7 @@ function renderHeatmap() {
   renderHeatmapLegend();
   renderPdfFilterDropdown();
   renderHeatmapSummary();
+  renderCommitmentResults();
 }
 
 /* Plain-language read-out of the heatmap so a non-technical founder
@@ -2423,6 +2607,49 @@ function renderHeatmapSummary() {
     +   (flops.length ? '<ol>' + flops.map(item).join('') + '</ol>'
                       : '<div class="muted-empty">Nothing is landing negatively — good sign!</div>')
     + '</div>'
+    + '</div>';
+}
+function renderCommitmentResults() {
+  const wrap = document.getElementById('commitment-results');
+  if (!wrap) return;
+  const c = activeCycle();
+  const test = cycleCommitmentTest(c);
+  if (!test.enabled) { wrap.innerHTML = ''; return; }
+
+  const rows = c.participants.map(p => ({ p, answer: c.commitments && c.commitments[p.id] }))
+    .filter(row => hasCommitmentAnswer(row.answer));
+  if (!rows.length) {
+    wrap.innerHTML = '<div class="help-callout" style="margin-top:16px;margin-bottom:0">'
+      + '<span class="ico">?</span>'
+      + '<div><strong>Commitment test is on.</strong> No one has answered the final commitment question yet.</div>'
+      + '</div>';
+    return;
+  }
+
+  const yes = rows.filter(row => row.answer.answer === 'yes');
+  const no = rows.filter(row => row.answer.answer === 'no');
+  const tallyReasons = (items) => {
+    const counts = {};
+    items.forEach(row => { counts[row.answer.reason] = (counts[row.answer.reason] || 0) + 1; });
+    return Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  };
+  const reasonList = (items, cls) => items.length
+    ? '<ul style="margin:6px 0 0;padding-left:18px">' + items.map(([reason, count]) => `<li><span class="commitment-pill ${cls}">${count}</span> ${escapeHtml(reason)}</li>`).join('') + '</ul>'
+    : '<div class="muted-empty">None yet.</div>';
+  const personRows = rows.map(row => {
+    const label = row.p.label + (row.p.name ? ' (' + row.p.name + ')' : '');
+    const cls = row.answer.answer === 'yes' ? 'yes' : 'no';
+    return `<div>${escapeHtml(label)}</div><div><span class="commitment-pill ${cls}">${row.answer.answer === 'yes' ? 'Yes' : 'No'}</span> ${escapeHtml(row.answer.reason)}</div>`;
+  }).join('');
+
+  wrap.innerHTML = '<div class="commitment-results-card">'
+    + '<h4>Commitment test</h4>'
+    + `<div style="font-size:13px;color:var(--muted);margin-bottom:10px">${escapeHtml(test.question)}</div>`
+    + '<div class="hm-summary-grid">'
+    + `<div class="hm-sum-card win"><h4>Yes - ${yes.length}</h4>${reasonList(tallyReasons(yes), 'yes')}</div>`
+    + `<div class="hm-sum-card flop"><h4>No - ${no.length}</h4>${reasonList(tallyReasons(no), 'no')}</div>`
+    + '</div>'
+    + '<div class="commitment-results-grid" style="margin-top:12px">' + personRows + '</div>'
     + '</div>';
 }
 function renderHeatmapLegend() {
@@ -2615,7 +2842,7 @@ function shareLang() {
 }
 async function buildParticipantUrl() {
   const c = activeCycle();
-  const slidesPayload = { cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap };
+  const slidesPayload = { cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap, commitmentTest: publicCommitmentTest(c) };
   const data = await encodePayloadCompressed(slidesPayload);
   const base = window.location.href.split(/[?#]/)[0];
   const lang = shareLang();
@@ -2702,7 +2929,7 @@ document.getElementById('generate-standalone-btn').addEventListener('click', asy
     showToast('Translating slides…');
     try { slidesForFile = await translateSlidesContent(c.slides, lang); } catch (e) {}
   }
-  const html = buildStandaloneParticipantHtml(slidesForFile, c.name, state.scoreMap);
+  const html = buildStandaloneParticipantHtml(slidesForFile, c.name, state.scoreMap, publicCommitmentTest(c));
   const blob = new Blob([html], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -2720,10 +2947,10 @@ function normTxt(s) {
 function parseRxnInput(payload) {
   if (!payload) throw new Error('No payload');
   if (payload.v === 2 && Array.isArray(payload.data)) {
-    return { version: 2, name: payload.name || '', data: payload.data };
+    return { version: 2, name: payload.name || '', data: payload.data, commitment: payload.commitment || null };
   }
   if (payload.reactions && typeof payload.reactions === 'object') {
-    return { version: 1, name: payload.name || '', reactions: payload.reactions };
+    return { version: 1, name: payload.name || '', reactions: payload.reactions, commitment: payload.commitment || null };
   }
   throw new Error('Not a valid reactions payload');
 }
@@ -2875,10 +3102,11 @@ document.getElementById('import-confirm').addEventListener('click', async () => 
       const existing = c.reactions[k] || {};
       c.reactions[k] = { reaction: m.reaction, phrases: existing.phrases || '' };
     }
+    const importedCommitment = applyCommitmentAnswer(c, target.id, parsed.commitment);
     if (parsed.name && !target.name) target.name = parsed.name;
     save();
     renderShare();
-    showToast(`Imported ${result.applied.length} reactions${result.skipped.length ? ' (' + result.skipped.length + ' skipped)' : ''}`);
+    showToast(`Imported ${result.applied.length} reactions${importedCommitment ? ' + commitment' : ''}${result.skipped.length ? ' (' + result.skipped.length + ' skipped)' : ''}`);
     document.getElementById('import-code-input').value = '';
     document.getElementById('import-file').value = '';
   };
@@ -2980,6 +3208,7 @@ function renderEditSlides() {
     if (!slide) return;
     sEl.querySelectorAll('input[data-field], select[data-field]').forEach(el => {
       const applySlideField = () => {
+        if (slide[el.dataset.field] === el.value) return;
         slide[el.dataset.field] = el.value;
         if (el.dataset.field === 'color') sEl.style.setProperty('--slide-accent', el.value);
         save();
@@ -2996,6 +3225,7 @@ function renderEditSlides() {
       if (!st) return;
       row.querySelectorAll('[data-stmt-field]').forEach(el => {
         const applyStatementField = () => {
+          if (st[el.dataset.stmtField] === el.value) return;
           st[el.dataset.stmtField] = el.value;
           save();
         };
@@ -3133,6 +3363,7 @@ function renderParticipants() {
           if (c.participants.length === 1) { showToast('You need at least one participant'); return; }
           if (!confirm(`Delete ${p.label}${p.name ? ' (' + p.name + ')' : ''} and all their reactions?`)) return;
           Object.keys(c.reactions).forEach(k => { if (k.startsWith(p.id + '|')) delete c.reactions[k]; });
+          if (c.commitments) delete c.commitments[p.id];
           c.participants.splice(idx, 1);
           if (c.activeParticipantId === p.id) c.activeParticipantId = c.participants[0].id;
         }
@@ -3166,7 +3397,7 @@ document.getElementById('import-file-input').addEventListener('change', async (e
     const imported = JSON.parse(await file.text());
     if (!imported.cycles) throw new Error('Not a valid backup');
     if (!confirm('Replace ALL current data with the imported backup?')) return;
-    state = imported;
+    state = normalizeStateShape(imported);
     if (!state.scoreMap) state.scoreMap = { ...DEFAULT_SCORE_MAP };
     save(); renderCycleSelect(); setView(state.activeView || 'interview');
     showToast('Backup imported');
@@ -3176,7 +3407,7 @@ document.getElementById('import-file-input').addEventListener('change', async (e
 document.getElementById('reset-cycle-reactions').addEventListener('click', () => {
   const c = activeCycle();
   if (!confirm(`Clear all reactions and notes in "${c.name}"?`)) return;
-  c.reactions = {}; save(); setView(state.activeView); showToast('Reactions cleared');
+  c.reactions = {}; c.commitments = {}; save(); setView(state.activeView); showToast('Reactions cleared');
 });
 document.getElementById('reset-everything').addEventListener('click', () => {
   if (!confirm('This wipes EVERYTHING — cycles, participants, reactions, edits — and restores defaults. Sure?')) return;
@@ -3422,6 +3653,7 @@ function renderImportPreview(parsedSlides) {
     c.slides = buildSlides(0);
     c.activeSlideId = c.slides[0] ? c.slides[0].id : null;
     c.reactions = {};
+    c.commitments = {};
     save();
     showToast('Replaced with ' + c.slides.length + ' slide' + (c.slides.length === 1 ? '' : 's'));
     clearPreview();
@@ -3484,6 +3716,17 @@ function downloadCsv(c) {
     }
     lines.push('');
   }
+  const test = cycleCommitmentTest(c);
+  if (test.enabled) {
+    lines.push(['COMMITMENT TEST', test.question].map(csvEscape).join(','));
+    lines.push(['Participant', 'Answer', 'Reason'].map(csvEscape).join(','));
+    for (const p of c.participants) {
+      const ans = c.commitments && c.commitments[p.id];
+      if (!hasCommitmentAnswer(ans)) continue;
+      lines.push([p.label + (p.name ? ' (' + p.name + ')' : ''), ans.answer === 'yes' ? 'Yes' : 'No', ans.reason].map(csvEscape).join(','));
+    }
+    lines.push('');
+  }
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -3521,6 +3764,17 @@ function buildSummaryText(c) {
       out += summaryStmt(c, slide, st, lbl);
     }
   }
+  const test = cycleCommitmentTest(c);
+  if (test.enabled) {
+    out += `\nCOMMITMENT TEST\n`;
+    out += `${test.question}\n`;
+    for (const p of c.participants) {
+      const ans = c.commitments && c.commitments[p.id];
+      if (!hasCommitmentAnswer(ans)) continue;
+      const pName = p.label + (p.name ? ' (' + p.name + ')' : '');
+      out += `  ${pName}: ${formatCommitmentAnswer(ans)}\n`;
+    }
+  }
   return out;
 }
 function summaryStmt(c, slide, st, lbl) {
@@ -3548,10 +3802,11 @@ function downloadSummary(c) {
 }
 
 /* ---- STANDALONE PARTICIPANT HTML BUILDER ---- */
-function buildStandaloneParticipantHtml(slides, cycleName, scoreMap) {
+function buildStandaloneParticipantHtml(slides, cycleName, scoreMap, commitmentTest) {
   const slidesJson = JSON.stringify(slides);
   const cycleNameJson = JSON.stringify(cycleName || '');
   const scoreMapJson = JSON.stringify(scoreMap || { love: 3, like: 1, dislike: -1 });
+  const commitmentTestJson = JSON.stringify(normalizeCommitmentTest(commitmentTest));
   const titleEsc = escapeHtml(cycleName || 'Validation Interview');
 
   return `<!DOCTYPE html>
@@ -3611,12 +3866,14 @@ body{margin:0;background:#fafbfc;color:#1b1d22;font-family:-apple-system,BlinkMa
 const SLIDES = ${slidesJson};
 const CYCLE_NAME = ${cycleNameJson};
 const SCORE_MAP = ${scoreMapJson};
+const COMMITMENT_TEST = ${commitmentTestJson};
 const STORAGE_KEY = 'validation-pp-' + (CYCLE_NAME || 'untitled') + '-' + (SLIDES[0] && SLIDES[0].id || 'x');
 
 let pp = (() => {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || { name: '', reactions: {}, idx: -1 }; }
   catch { return { name: '', reactions: {}, idx: -1 }; }
 })();
+if (!pp.commitment) pp.commitment = null;
 function ppSave() { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(pp)); } catch (e) {} }
 
 function esc(s) {
@@ -3635,12 +3892,18 @@ function toast(msg) {
   t.textContent = msg; t.classList.add('show');
   setTimeout(() => t.classList.remove('show'), 1800);
 }
+function hasCommitmentAnswer(answer) {
+  return !!(answer && (answer.answer === 'yes' || answer.answer === 'no') && String(answer.reason || '').trim());
+}
 
 const root = document.getElementById('root');
 
 function render() {
   if (pp.idx === -1) renderWelcome();
-  else if (pp.idx >= SLIDES.length) renderDone();
+  else if (pp.idx >= SLIDES.length) {
+    if (COMMITMENT_TEST && COMMITMENT_TEST.enabled && !hasCommitmentAnswer(pp.commitment)) renderCommitment();
+    else renderDone();
+  }
   else renderSlide(SLIDES[pp.idx], pp.idx);
 }
 
@@ -3704,10 +3967,36 @@ function renderStmt(st) {
     '</div></div>';
 }
 
+function renderCommitment() {
+  const ans = pp.commitment || {};
+  const opts = ans.answer === 'no' ? COMMITMENT_TEST.noOptions : COMMITMENT_TEST.yesOptions;
+  root.innerHTML = '<div class="progress"><span>Final question</span><div class="dots">' +
+    SLIDES.map(() => '<span class="dot done"></span>').join('') + '<span class="dot active"></span></div></div>' +
+    '<div class="card slide" style="--accent:#5e35b1"><h2>One last question</h2>' +
+      '<div class="stmt" style="display:block">' +
+        '<div class="stmt-text headline" style="margin-bottom:12px">' + esc(COMMITMENT_TEST.question) + '</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">' +
+          '<button class="btn ' + (ans.answer === 'yes' ? 'primary' : '') + '" data-ca="yes">Yes</button>' +
+          '<button class="btn ' + (ans.answer === 'no' ? 'primary' : '') + '" data-ca="no">No</button>' +
+        '</div>' +
+        (ans.answer ? '<div style="display:grid;gap:8px">' + opts.map(o => '<button class="btn ' + (ans.reason === o ? 'primary' : '') + '" data-cr="' + esc(o) + '">' + esc(o) + '</button>').join('') + '</div>' : '<p style="color:#6b6f76;margin:0">Choose Yes or No, then pick the closest reason.</p>') +
+      '</div></div>' +
+    '<div class="nav"><button class="btn" id="pp-commit-prev">← Previous</button><button class="btn primary" id="pp-commit-next" ' + (hasCommitmentAnswer(ans) ? '' : 'disabled') + '>Done →</button></div>';
+  root.querySelectorAll('[data-ca]').forEach(btn => {
+    btn.addEventListener('click', () => { pp.commitment = { answer: btn.dataset.ca, reason: '', question: COMMITMENT_TEST.question, updatedAt: new Date().toISOString() }; ppSave(); renderCommitment(); });
+  });
+  root.querySelectorAll('[data-cr]').forEach(btn => {
+    btn.addEventListener('click', () => { pp.commitment = { answer: ans.answer, reason: btn.dataset.cr, question: COMMITMENT_TEST.question, updatedAt: new Date().toISOString() }; ppSave(); renderCommitment(); });
+  });
+  document.getElementById('pp-commit-prev').addEventListener('click', () => { pp.idx = Math.max(0, SLIDES.length - 1); ppSave(); render(); window.scrollTo({top:0}); });
+  document.getElementById('pp-commit-next').addEventListener('click', () => { if (hasCommitmentAnswer(pp.commitment)) { renderDone(); window.scrollTo({top:0}); } });
+}
+
 function renderDone() {
   const v2Payload = {
     name: pp.name,
     v: 2,
+    commitment: hasCommitmentAnswer(pp.commitment) ? pp.commitment : null,
     data: SLIDES.map(slide => ({
       h: slide.headline,
       i: slide.id,
@@ -3911,6 +4200,7 @@ async function initParticipantMode() {
   document.documentElement.lang = ppLang;
 
   let slides, cycleName = '', scoreMap = { ...DEFAULT_SCORE_MAP }, ppName = '';
+  let commitmentTest = normalizeCommitmentTest(null);
   let targetParticipantId = null;
 
   if (shareToken) {
@@ -3934,6 +4224,7 @@ async function initParticipantMode() {
     slides = Array.isArray(pl.slides) ? JSON.parse(JSON.stringify(pl.slides)) : [];
     cycleName = pl.cycleName || '';
     if (pl.scoreMap) scoreMap = pl.scoreMap;
+    commitmentTest = normalizeCommitmentTest(pl.commitmentTest);
     collectFid = share.founder_id || pl.founderId || '';
     collectCid = share.cycle_key || pl.cycleKey || '';
     if (pl.lang && PP_LANGS.indexOf(pl.lang) !== -1) { ppLang = pl.lang; document.documentElement.lang = ppLang; }
@@ -3954,10 +4245,10 @@ async function initParticipantMode() {
         if (uid) {
           currentUserId = uid;
           const cached = readLocalCache(uid);
-          if (cached) state = cached;
+          if (cached) state = normalizeStateShape(cached);
           try {
             const row = await cloudLoad(uid);
-            if (row && row.data && row.data.cycles && row.data.cycles.length) state = row.data;
+            if (row && row.data && row.data.cycles && row.data.cycles.length) state = normalizeStateShape(row.data);
           } catch (e) { /* offline — keep cached copy */ }
         }
       } catch (e) { /* fall back to whatever state is loaded */ }
@@ -3967,6 +4258,7 @@ async function initParticipantMode() {
     slides = JSON.parse(JSON.stringify(cyc.slides));
     cycleName = cyc.name;
     scoreMap = state.scoreMap;
+    commitmentTest = publicCommitmentTest(cyc);
     targetParticipantId = ppParam || cyc.activeParticipantId;
   } else if (dataParam) {
     try {
@@ -3974,6 +4266,7 @@ async function initParticipantMode() {
       slides = decoded.slides;
       cycleName = decoded.cycleName || '';
       if (decoded.scoreMap) scoreMap = decoded.scoreMap;
+      commitmentTest = normalizeCommitmentTest(decoded.commitmentTest);
     } catch (e) {
       root.innerHTML = `<div class="pp-welcome"><h1>Couldn't load slides</h1><p>The link looks broken. Ask the interviewer for a fresh one.</p></div>`;
       return;
@@ -4001,7 +4294,10 @@ async function initParticipantMode() {
     try { return JSON.parse(localStorage.getItem(sessionKey)) || { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
     catch { return { name: '', reactions: {}, currentIdx: -1, submitted: false }; }
   })();
+  if (!ppState.commitment) ppState.commitment = null;
   function ppSave() { try { localStorage.setItem(sessionKey, JSON.stringify(ppState)); } catch (e) {} }
+  function commitmentIsEnabled() { return !!(commitmentTest && commitmentTest.enabled); }
+  function commitmentIsComplete() { return !commitmentIsEnabled() || hasCommitmentAnswer(ppState.commitment); }
 
   /* Localized interface copy for the interviewee view. */
   const PT_ALL = {
@@ -4102,10 +4398,25 @@ async function initParticipantMode() {
     }
     save();
   }
+  function syncCommitmentToInterviewerLocalStorage() {
+    if (!localMode || !targetParticipantId || !hasCommitmentAnswer(ppState.commitment)) return;
+    const cyc = activeCycle();
+    if (!cyc) return;
+    applyCommitmentAnswer(cyc, targetParticipantId, {
+      answer: ppState.commitment.answer,
+      reason: ppState.commitment.reason,
+      question: commitmentTest.question,
+      updatedAt: ppState.commitment.updatedAt
+    });
+    save();
+  }
 
   function render() {
     if (ppState.currentIdx === -1) { renderWelcome(); return; }
-    if (ppState.currentIdx >= slides.length) { renderDone(); return; }
+    if (ppState.currentIdx >= slides.length) {
+      if (commitmentIsEnabled() && !commitmentIsComplete()) { renderCommitment(); return; }
+      renderDone(); return;
+    }
     renderSlide(slides[ppState.currentIdx], ppState.currentIdx);
   }
 
@@ -4192,6 +4503,58 @@ async function initParticipantMode() {
     document.getElementById('pp-next').addEventListener('click', () => { ppState.currentIdx++; ppSave(); render(); window.scrollTo({top:0}); });
   }
 
+  function renderCommitment() {
+    const answer = ppState.commitment || {};
+    const options = answer.answer === 'no' ? commitmentTest.noOptions : commitmentTest.yesOptions;
+    const heading = answer.answer === 'no' ? 'What is the main reason?' : 'What makes you say yes?';
+    root.innerHTML = `<div class="pp-progress">
+      <span>Final question</span>
+      <div class="pp-dots">${slides.map(() => '<span class="pp-dot done"></span>').join('')}<span class="pp-dot active"></span></div>
+    </div>
+    <div class="pp-slide" style="--slide-accent:#5e35b1">
+      <h2>One last question</h2>
+      <div class="pp-stmt">
+        <div class="pp-stmt-head"><span class="pp-stmt-label">Commitment test</span></div>
+        <div class="pp-stmt-text is-headline">${escapeHtml(commitmentTest.question)}</div>
+        <div class="commitment-choice-row">
+          <button class="btn ${answer.answer === 'yes' ? 'active yes' : ''}" data-commit-answer="yes" type="button">Yes</button>
+          <button class="btn ${answer.answer === 'no' ? 'active no' : ''}" data-commit-answer="no" type="button">No</button>
+        </div>
+        ${answer.answer ? `<div class="pp-stmt-head"><span class="pp-stmt-label">${escapeHtml(heading)}</span></div>
+          <div class="commitment-option-list">
+            ${options.map(opt => `<button class="btn ${answer.reason === opt ? 'active' : ''}" data-commit-reason="${escapeHtml(opt)}" type="button">${escapeHtml(opt)}</button>`).join('')}
+          </div>` : '<p style="color:var(--muted);margin:6px 0 0">Choose Yes or No, then pick the closest reason.</p>'}
+      </div>
+    </div>
+    <div class="pp-nav">
+      <button id="pp-commit-prev">${PT.prev}</button>
+      <button class="primary" id="pp-commit-next" ${hasCommitmentAnswer(answer) ? '' : 'disabled'}>${PT.doneNav}</button>
+    </div>`;
+    root.querySelectorAll('[data-commit-answer]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const nextAnswer = btn.dataset.commitAnswer;
+        ppState.commitment = { answer: nextAnswer, reason: '', question: commitmentTest.question, updatedAt: new Date().toISOString() };
+        ppSave();
+        renderCommitment();
+      });
+    });
+    root.querySelectorAll('[data-commit-reason]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        ppState.commitment = {
+          answer: answer.answer,
+          reason: btn.dataset.commitReason,
+          question: commitmentTest.question,
+          updatedAt: new Date().toISOString()
+        };
+        ppSave();
+        syncCommitmentToInterviewerLocalStorage();
+        renderCommitment();
+      });
+    });
+    document.getElementById('pp-commit-prev').addEventListener('click', () => { ppState.currentIdx = Math.max(0, slides.length - 1); ppSave(); render(); window.scrollTo({top:0}); });
+    document.getElementById('pp-commit-next').addEventListener('click', () => { if (!hasCommitmentAnswer(ppState.commitment)) return; syncCommitmentToInterviewerLocalStorage(); renderDone(); window.scrollTo({top:0}); });
+  }
+
   function ppStmtInfo(type, featNum) {
     switch (type) {
       case 'headline': return { label: PT.tlHeadline, help: PT.thHeadline };
@@ -4225,6 +4588,7 @@ async function initParticipantMode() {
 
   function renderDone() {
     syncToInterviewerLocalStorage();
+    syncCommitmentToInterviewerLocalStorage();
     if (localMode) {
       root.innerHTML = `<div class="pp-done-screen">
         <h2>${PT.lThanks}</h2>
@@ -4239,6 +4603,7 @@ async function initParticipantMode() {
     const payload = {
       name: ppState.name,
       v: 2,
+      commitment: hasCommitmentAnswer(ppState.commitment) ? ppState.commitment : null,
       data: slides.map(slide => ({
         h: slide.headline,
         i: slide.id,
@@ -5087,7 +5452,7 @@ function showToast(msg) {
     var base = '';
     try { base = await buildParticipantUrl(); }
     catch (e1) {
-      var data = encodePayload({ cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap });
+      var data = encodePayload({ cycleName: c.name, slides: c.slides, scoreMap: state.scoreMap, commitmentTest: publicCommitmentTest(c) });
       base = shareOrigin() + '?view=participant&data=' + data
         + '&sid=s' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
     }
@@ -5121,6 +5486,7 @@ function showToast(msg) {
         cycleName: c.name,
         slides: c.slides,
         scoreMap: state.scoreMap,
+        commitmentTest: publicCommitmentTest(c),
         lang: lang,
         founderId: currentUserId,
         cycleKey: c.id,
@@ -5160,11 +5526,14 @@ function showToast(msg) {
     if (!c.participants) c.participants = [];
     name = (name || '').trim();
     var reactions = c.reactions || {};
+    var commitments = c.commitments || {};
     for (var i = 0; i < c.participants.length; i++) {
       var ep = c.participants[i];
       if (ep.name && String(ep.name).trim()) continue; // slot already belongs to someone
       var hasReactions = Object.keys(reactions).some(function (k) { return k.indexOf(ep.id + '|') === 0 && reactions[k] && reactions[k].reaction; });
+      var hasCommitment = hasCommitmentAnswer(commitments[ep.id]);
       if (hasReactions) continue;                       // slot already has reactions
+      if (hasCommitment) continue;                      // slot already has a final answer
       if (name) ep.name = name;                         // fill this open slot with their name
       return ep;
     }
@@ -5205,15 +5574,17 @@ function showToast(msg) {
     try { payload = decodePayload(String(codeStr).replace(/^RXN-/, '').replace(/\s+/g, '')); } catch (e) { return { ok: false, reason: 'decode' }; }
     var parsed;
     try { parsed = parseRxnInput(payload); } catch (e) { return { ok: false, reason: 'parse' }; }
-    if (countIncomingReactions(parsed) === 0) return { ok: false, reason: 'no_reactions' };
+    var hasCommitment = hasCommitmentAnswer(parsed.commitment);
+    if (countIncomingReactions(parsed) === 0 && !hasCommitment) return { ok: false, reason: 'no_reactions' };
     var c = activeCycle();
     var result = matchReactionsToCycle(parsed, c);
-    if (!result || !result.applied || !result.applied.length) return { ok: false, reason: 'no_match' };
+    if ((!result || !result.applied || !result.applied.length) && !hasCommitment) return { ok: false, reason: 'no_match' };
     var p = createRemoteParticipant(c, name || parsed.name || '');
     for (var i = 0; i < result.applied.length; i++) {
       var m = result.applied[i];
       c.reactions[rkey(p.id, m.slideId, m.stmtId)] = { reaction: m.reaction, phrases: '' };
     }
+    applyCommitmentAnswer(c, p.id, parsed.commitment);
     return { ok: true, reason: 'ok' };
   }
 
@@ -5229,15 +5600,17 @@ function showToast(msg) {
       && ((pl.v === 2 && Array.isArray(pl.data)) || (pl.reactions && typeof pl.reactions === 'object'));
     if (isStructured) {
       try { parsed = parseRxnInput(pl); } catch (e) { return { ok: false, reason: 'parse' }; }
-      if (countIncomingReactions(parsed) === 0) return { ok: false, reason: 'no_reactions' };
+      var hasCommitment = hasCommitmentAnswer(parsed.commitment);
+      if (countIncomingReactions(parsed) === 0 && !hasCommitment) return { ok: false, reason: 'no_reactions' };
       var c = activeCycle();
       var result = matchReactionsToCycle(parsed, c);
-      if (!result || !result.applied || !result.applied.length) return { ok: false, reason: 'no_match' };
+      if ((!result || !result.applied || !result.applied.length) && !hasCommitment) return { ok: false, reason: 'no_match' };
       var p = createRemoteParticipant(c, name || parsed.name || '');
       for (var i = 0; i < result.applied.length; i++) {
         var m = result.applied[i];
         c.reactions[rkey(p.id, m.slideId, m.stmtId)] = { reaction: m.reaction, phrases: '' };
       }
+      applyCommitmentAnswer(c, p.id, parsed.commitment);
       return { ok: true, reason: 'ok' };
     }
     // Legacy code-based row.
@@ -5471,6 +5844,13 @@ function showToast(msg) {
     if (!p) { p = c.participants[0]; pid = p.id; }
     c.activeParticipantId = pid;
     if (typeof save === 'function') save();
+    var commitmentTest = (typeof publicCommitmentTest === 'function') ? publicCommitmentTest(c) : { enabled: false };
+    var commitmentDraft = c.commitments && c.commitments[pid] ? {
+      answer: c.commitments[pid].answer,
+      reason: c.commitments[pid].reason,
+      question: c.commitments[pid].question,
+      updatedAt: c.commitments[pid].updatedAt
+    } : {};
 
     function keyFor(slideId, stId) { return rkey(pid, slideId, stId); }
     function getR(slideId, stId) { var v = c.reactions[keyFor(slideId, stId)]; return v && v.reaction ? v.reaction : null; }
@@ -5480,6 +5860,18 @@ function showToast(msg) {
       cur.reaction = val || null;
       c.reactions[k] = cur;
       if (typeof save === 'function') save();   // live save through normal cloud-sync path
+    }
+    function setCommitment(answer, reason) {
+      commitmentDraft = {
+        answer: answer,
+        reason: reason || '',
+        question: commitmentTest.question || '',
+        updatedAt: new Date().toISOString()
+      };
+      if (hasCommitmentAnswer(commitmentDraft)) {
+        applyCommitmentAnswer(c, pid, commitmentDraft);
+        if (typeof save === 'function') save();
+      }
     }
 
     var overlay = ensureOverlay();
@@ -5500,7 +5892,10 @@ function showToast(msg) {
 
     function render() {
       if (idx < 0) return renderWelcome();
-      if (idx >= c.slides.length) return renderDone();
+      if (idx >= c.slides.length) {
+        if (commitmentTest && commitmentTest.enabled && !hasCommitmentAnswer(commitmentDraft)) return renderCommitment();
+        return renderDone();
+      }
       return renderSlide(idx);
     }
 
@@ -5566,6 +5961,37 @@ function showToast(msg) {
       });
       overlay.querySelector('#ip-prev').addEventListener('click', function () { if (idx > 0) { idx--; render(); overlay.scrollTo({ top: 0 }); } });
       overlay.querySelector('#ip-next').addEventListener('click', function () { idx++; render(); overlay.scrollTo({ top: 0 }); });
+    }
+
+    function renderCommitment() {
+      var ans = commitmentDraft || {};
+      var opts = ans.answer === 'no' ? (commitmentTest.noOptions || []) : (commitmentTest.yesOptions || []);
+      overlay.innerHTML = header()
+        + '<div class="ip-body">'
+        + '<div class="pp-progress"><span>Final question</span><div class="pp-dots">'
+        + c.slides.map(function () { return '<span class="pp-dot done"></span>'; }).join('') + '<span class="pp-dot active"></span></div></div>'
+        + '<div class="pp-slide" style="--slide-accent:#5e35b1"><h2>One last question</h2>'
+        + '<div class="pp-stmt"><div class="pp-stmt-head"><span class="pp-stmt-label">Commitment test</span></div>'
+        + '<div class="pp-stmt-text is-headline">' + esc(commitmentTest.question || 'Would you commit to taking the next step?') + '</div>'
+        + '<div class="commitment-choice-row">'
+        + '<button class="btn ' + (ans.answer === 'yes' ? 'active yes' : '') + '" data-ca="yes" type="button">Yes</button>'
+        + '<button class="btn ' + (ans.answer === 'no' ? 'active no' : '') + '" data-ca="no" type="button">No</button>'
+        + '</div>'
+        + (ans.answer ? '<div class="pp-stmt-head"><span class="pp-stmt-label">' + (ans.answer === 'yes' ? 'What makes you say yes?' : 'What is the main reason?') + '</span></div><div class="commitment-option-list">'
+          + opts.map(function (o) { return '<button class="btn ' + (ans.reason === o ? 'active' : '') + '" data-cr="' + esc(o) + '" type="button">' + esc(o) + '</button>'; }).join('')
+          + '</div>' : '<p style="color:var(--muted);margin:6px 0 0">Choose Yes or No, then pick the closest reason.</p>')
+        + '</div></div>'
+        + '<div class="pp-nav"><button id="ip-commit-prev">â† Previous</button><button class="primary" id="ip-commit-next" ' + (hasCommitmentAnswer(ans) ? '' : 'disabled') + '>Done â†’</button></div>'
+        + '</div>';
+      wireClose();
+      overlay.querySelectorAll('[data-ca]').forEach(function (btn) {
+        btn.addEventListener('click', function () { setCommitment(btn.getAttribute('data-ca'), ''); renderCommitment(); overlay.scrollTo({ top: 0 }); });
+      });
+      overlay.querySelectorAll('[data-cr]').forEach(function (btn) {
+        btn.addEventListener('click', function () { setCommitment(ans.answer, btn.getAttribute('data-cr')); renderCommitment(); });
+      });
+      overlay.querySelector('#ip-commit-prev').addEventListener('click', function () { idx = Math.max(0, c.slides.length - 1); render(); overlay.scrollTo({ top: 0 }); });
+      overlay.querySelector('#ip-commit-next').addEventListener('click', function () { if (hasCommitmentAnswer(commitmentDraft)) renderDone(); });
     }
 
     function renderDone() {
