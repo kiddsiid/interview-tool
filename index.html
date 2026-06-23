@@ -288,6 +288,23 @@
     margin-bottom: 12px;
   }
   .heatmap-table-wrap { overflow-x: auto; border-radius: 10px; box-shadow: var(--shadow); background: var(--surface); }
+  /* Keep the statement-label column pinned while participant columns scroll
+     horizontally (helps tablet + desktop when there are many participants). */
+  table.heatmap td.label { position: sticky; left: 0; z-index: 1; }
+  table.heatmap thead th.label { z-index: 3; }
+  /* Phone card view (built by buildHeatmapCards) — hidden until ≤639px. */
+  .heatmap-cards { display: none; }
+  .hm-card-slide { margin: 14px 0 8px; padding: 8px 12px; border-radius: 9px; font-weight: 700; font-size: 13px; color: #fff; background: var(--slide-accent, #555); }
+  .hm-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 13px; margin-bottom: 10px; box-shadow: var(--shadow-sm); }
+  .hm-card-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .hm-card-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--muted); }
+  .hm-card-total { font-size: 12px; font-weight: 800; color: var(--text); background: var(--soft); border-radius: 999px; padding: 2px 10px; }
+  .hm-card-text { font-size: 14.5px; line-height: 1.4; color: var(--text); margin-bottom: 10px; }
+  .hm-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+  .hm-chip { position: relative; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 600; cursor: pointer; touch-action: manipulation; -webkit-tap-highlight-color: rgba(99,102,241,0.18); min-height: 38px; }
+  .hm-chip-e { font-size: 16px; line-height: 1; }
+  .hm-chip-p { font-weight: 700; }
+  .hm-chip-dot { position: absolute; top: 2px; right: 5px; font-size: 12px; line-height: 1; opacity: 0.85; }
   table.heatmap {
     border-collapse: collapse;
     width: 100%;
@@ -337,6 +354,10 @@
     font-weight: 700;
     width: 80px;
     position: relative;
+    /* Let a tap register as a tap (open the editor) rather than being
+       swallowed by the horizontally-scrolling wrapper on touch devices. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(99,102,241,0.25);
   }
   table.heatmap td.score-cell .emoji { font-size: 16px; display: block; line-height: 1; }
   table.heatmap td.score-cell .score-num { font-size: 11px; opacity: 0.8; display: block; margin-top: 2px; }
@@ -351,6 +372,16 @@
   table.heatmap td.total-cell { font-weight: 700; background: var(--soft); min-width: 60px; }
   table.heatmap tr.totals-row td { font-weight: 700; background: var(--soft); }
   table.heatmap tr.totals-row td.label { background: var(--border); }
+
+  /* Mobile: bigger, easier-to-hit heatmap cells + roomier cell-editor so the
+     owner can tap-to-edit reactions on a phone exactly like on desktop. */
+  @media (max-width: 720px) {
+    table.heatmap td.score-cell { width: 58px; min-width: 58px; padding: 14px 6px; }
+    table.heatmap td.score-cell .emoji { font-size: 20px; }
+    .heatmap-table-wrap { -webkit-overflow-scrolling: touch; }
+    #modal-rxn .rxn-btn { width: 52px; height: 52px; font-size: 24px; touch-action: manipulation; }
+    .modal { padding: 18px; }
+  }
 
   .legend {
     display: flex;
@@ -564,6 +595,10 @@
     justify-content: center;
     padding: 0;
     transition: all 0.12s ease;
+    /* Register fast taps reliably on mobile (no 300ms delay / double-tap
+       zoom) so no reaction is dropped during the interview. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(99,102,241,0.25);
   }
   .pp-rxn button:hover { transform: scale(1.06); }
   .pp-rxn button.active.love    { background: var(--love-bg); border-color: var(--love-c); transform: scale(1.1); }
@@ -750,6 +785,8 @@
   .tab { font-size: 13.5px; padding: 10px 15px; border-radius: 10px; transition: all 0.14s ease; }
   .tab.active { background: var(--brand-grad); box-shadow: 0 4px 12px rgba(79,70,229,0.28); }
   .tab:hover:not(.active) { background: var(--accent-soft); color: var(--accent); }
+  .tab-ico { font-size: 15px; }
+  .tab-label { margin-left: 6px; }
 
   /* ---------- Panels & cards ---------- */
   .panel { border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
@@ -1101,6 +1138,85 @@
 .pp-auto-status { max-width:440px; margin:14px auto; padding:11px 16px; border-radius:10px; font-size:14px; line-height:1.45; background:var(--soft); border:1px solid var(--border); color:var(--text); }
 .pp-auto-status.ok { background:var(--like-bg); border-color:var(--like-c); color:var(--like-c); }
 .pp-auto-status.err { background:var(--dis-bg); border-color:var(--dis-c); color:var(--dis-c); }
+
+/* ============================================================
+   MOBILE FOUNDATION — Phase M0 (phone ≤ 639px)
+   Top tab row becomes a fixed bottom nav; safe-area insets;
+   compact top bar; comfortable tap targets. Tablet/desktop
+   (≥ 640px) are completely unchanged.
+   ============================================================ */
+@media (max-width: 639px) {
+  .tabs {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    margin: 0; border: none; border-top: 1px solid var(--border); border-radius: 0;
+    gap: 0; padding: 4px 2px;
+    padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
+    overflow-x: visible;
+    background: var(--panel);
+    box-shadow: 0 -3px 14px rgba(20,22,40,0.14);
+  }
+  .tab {
+    flex: 1 1 0; min-width: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 2px; padding: 6px 1px; border-radius: 10px;
+    font-size: 10px; transition: none;
+    touch-action: manipulation; -webkit-tap-highlight-color: rgba(99,102,241,0.18);
+  }
+  .tab-ico { font-size: 20px; margin: 0; line-height: 1; }
+  .tab-label { margin: 0; font-size: 9.5px; font-weight: 600; line-height: 1.1; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+  /* Active state reads as an accent glyph + label (no pill) in the bar */
+  .tab.active, .tab:hover:not(.active) { background: transparent; box-shadow: none; color: var(--accent); }
+  [data-theme="dark"] .tab.active, [data-theme="dark"][data-scheme="midnight"] .tab.active { background: transparent; color: var(--accent); }
+  .tab.active .tab-label { font-weight: 800; }
+
+  /* Reserve space so content never hides behind the fixed bar */
+  .container { padding: 12px 12px calc(80px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Compact top bar */
+  .brand-tagline { display: none; }
+  .topbar { padding: 12px 14px; margin-bottom: 12px; gap: 8px; }
+  .brand-mark { width: 36px; height: 36px; font-size: 18px; }
+  .brand-name { font-size: 17px; }
+  .topbar-title { gap: 10px; }
+
+  /* Keep the floating account pill and toasts above the bottom bar */
+  body #vit-account { bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important; }
+  .toast { bottom: calc(90px + env(safe-area-inset-bottom, 0px)); }
+
+  /* Comfortable default tap targets; 16px inputs stop iOS zoom-on-focus */
+  .btn { min-height: 40px; }
+  .btn.tiny { min-height: 34px; }
+  select, input[type="text"], input[type="number"], textarea { font-size: 16px; }
+
+  /* Results: swap the wide grid for the stacked card view */
+  .heatmap-table-wrap { display: none; }
+  .heatmap-cards { display: block; }
+
+  /* Slides editor: each statement becomes a tidy stacked card */
+  .edit-stmt-row {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "type type" "text text" "label actions";
+    gap: 7px; padding: 10px; margin-bottom: 8px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--soft);
+  }
+  .edit-stmt-row select[data-stmt-field="type"] { grid-area: type; width: 100%; }
+  .edit-stmt-row input[data-stmt-field="text"] { grid-area: text; }
+  .edit-stmt-row .stmt-label { grid-area: label; justify-self: start; align-self: center; }
+  .edit-stmt-row > div { grid-area: actions; justify-self: end; }
+  .edit-field-group { grid-template-columns: 1fr; gap: 4px; }
+  .edit-slide { padding: 12px 13px; }
+  .edit-slide-head .btn.tiny, .edit-stmt-row .btn.tiny { min-width: 38px; }
+
+  /* Share / People / inline two-column blocks: stack on phone */
+  [style*="grid-template-columns:1fr 1fr"] { grid-template-columns: 1fr !important; }
+  .panel { padding: 14px; }
+
+  /* VP discovery: bigger sub-nav tap targets; component cards stack cleanly */
+  .vp-subnav button { min-height: 38px; padding: 9px 13px; touch-action: manipulation; }
+  .vp-comp-top { flex-direction: column; gap: 6px; }
+  .vp-conf { text-align: left; }
+  .vp-comp { padding: 13px 14px; }
+}
 </style>
 </head>
 <body>
@@ -1128,14 +1244,14 @@
     </div>
   </div>
 
-  <div class="tabs">
-    <button class="tab active" data-view="interview">🎤 Interview</button>
-    <button class="tab" data-view="heatmap">🔥 Results</button>
-    <button class="tab" data-view="share">🔗 Share</button>
-    <button class="tab" data-view="edit">✏️ Slides</button>
-    <button class="tab" data-view="participants">👥 People</button>
-    <button class="tab" data-view="vp">💎 Value Prop</button>
-    <button class="tab" data-view="settings">⚙️ Settings</button>
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-view="interview"><span class="tab-ico">🎤</span><span class="tab-label">Interview</span></button>
+    <button class="tab" data-view="heatmap"><span class="tab-ico">🔥</span><span class="tab-label">Results</span></button>
+    <button class="tab" data-view="share"><span class="tab-ico">🔗</span><span class="tab-label">Share</span></button>
+    <button class="tab" data-view="edit"><span class="tab-ico">✏️</span><span class="tab-label">Slides</span></button>
+    <button class="tab" data-view="participants"><span class="tab-ico">👥</span><span class="tab-label">People</span></button>
+    <button class="tab" data-view="vp"><span class="tab-ico">💎</span><span class="tab-label">Value&nbsp;Prop</span></button>
+    <button class="tab" data-view="settings"><span class="tab-ico">⚙️</span><span class="tab-label">Settings</span></button>
   </div>
 
   <!-- ============ INTERVIEW TAB ============ -->
@@ -1212,6 +1328,7 @@
       <div class="heatmap-table-wrap">
         <table class="heatmap" id="heatmap-table"></table>
       </div>
+      <div class="heatmap-cards" id="heatmap-cards"></div>
       <div class="legend" id="heatmap-legend"></div>
       <div id="commitment-results"></div>
       <div class="print-notes" id="print-notes"></div>
@@ -1795,6 +1912,29 @@ function scheduleCloudSave() {
       setSyncStatus('err', 'Offline — saved on this device');
     }
   }, 700);
+}
+/* Push the current state to the cloud RIGHT NOW instead of waiting on the
+   ~700ms debounce — used when an in-person reaction overlay closes or a
+   participant finishes, so another device opened seconds later pulls fresh
+   data. Safe by design: it never throws and never blocks the UI; if the
+   cloud isn't configured or the network is down it just leaves the normal
+   local save + debounced retry in place. */
+function flushCloudSave() {
+  if (!cloudConfigured() || !sb || !currentUserId) return;
+  clearTimeout(cloudSaveTimer);
+  cloudSavePending = true;
+  setSyncStatus('saving', 'Saving...');
+  (async function () {
+    try {
+      await cloudUpsert(currentUserId, state);
+      cloudSavePending = false;
+      setSyncStatus('ok', 'Synced');
+    } catch (e) {
+      cloudSavePending = false;
+      console.warn('cloud flush failed', e);
+      setSyncStatus('err', 'Offline — saved on this device');
+    }
+  })();
 }
 
 /* ---- load a signed-in user's data (with first-run migration) ---- */
@@ -2510,6 +2650,48 @@ function buildHeatmapRow(c, slide, st, labelText, pps, colTotals) {
   return row;
 }
 
+/* Phone-friendly representation of the same heatmap data: one card per
+   statement, each with a row of tappable participant chips. Chips carry the
+   same data-*-id attributes as the table cells, so the existing tap-to-edit
+   (openCellEditor) wiring works identically on mobile. */
+function buildHeatmapCards(c, participantsList) {
+  const pps = participantsList || c.participants;
+  let html = '';
+  for (const slide of c.slides) {
+    html += `<div class="hm-card-slide" style="--slide-accent:${slide.color}">${escapeHtml(slide.headline)}</div>`;
+    const items = [{ id: 'headline', type: 'headline', text: slide.headline, label: 'Headline' }];
+    let fIdx = 0;
+    for (const st of slide.statements) {
+      let lbl;
+      if (st.type === 'feature') { fIdx++; lbl = 'Feature ' + fIdx; }
+      else lbl = (STATEMENT_TYPES.find(t => t.key === st.type) || {}).label || 'Statement';
+      items.push({ id: st.id, type: st.type, text: st.text, label: lbl });
+    }
+    for (const it of items) {
+      let rowTotal = 0, chips = '';
+      pps.forEach(p => {
+        const r = c.reactions[rkey(p.id, slide.id, it.id)];
+        const score = r && r.reaction ? reactionToScore(r.reaction) : null;
+        const col = colorForScore(score);
+        if (score !== null) rowTotal += score;
+        const dot = r && r.phrases ? '<span class="hm-chip-dot">•</span>' : '';
+        const who = p.name ? escapeHtml(p.name) : escapeHtml(p.label);
+        chips += `<button class="hm-chip" data-p-id="${p.id}" data-s-id="${slide.id}" data-st-id="${it.id}" style="background:${col.bg};color:${col.fg}">
+          <span class="hm-chip-e">${reactionEmoji(r && r.reaction) || '·'}</span>
+          <span class="hm-chip-p">${who}</span>${dot}
+        </button>`;
+      });
+      const totalTxt = rowTotal > 0 ? '+' + rowTotal : ('' + rowTotal);
+      html += `<div class="hm-card">
+        <div class="hm-card-head"><span class="hm-card-label">${escapeHtml(it.label)}</span><span class="hm-card-total">${totalTxt}</span></div>
+        <div class="hm-card-text">${escapeHtml(it.text)}</div>
+        <div class="hm-chips">${chips}</div>
+      </div>`;
+    }
+  }
+  return html;
+}
+
 function renderPdfFilterDropdown() {
   const c = activeCycle();
   const sel = document.getElementById('pdf-participant-filter');
@@ -2535,6 +2717,14 @@ function renderHeatmap() {
   table.querySelectorAll('td.score-cell').forEach(td => {
     td.addEventListener('click', () => openCellEditor(td.dataset.pId, td.dataset.sId, td.dataset.stId));
   });
+  // Phone card view (same data, tappable chips → same cell editor).
+  const cards = document.getElementById('heatmap-cards');
+  if (cards) {
+    cards.innerHTML = buildHeatmapCards(c);
+    cards.querySelectorAll('.hm-chip').forEach(chip => {
+      chip.addEventListener('click', () => openCellEditor(chip.dataset.pId, chip.dataset.sId, chip.dataset.stId));
+    });
+  }
   renderHeatmapLegend();
   renderPdfFilterDropdown();
   renderHeatmapSummary();
@@ -4589,6 +4779,8 @@ async function initParticipantMode() {
   function renderDone() {
     syncToInterviewerLocalStorage();
     syncCommitmentToInterviewerLocalStorage();
+    // Same-device URL handoff finished — flush to cloud immediately too.
+    if (localMode && typeof flushCloudSave === 'function') flushCloudSave();
     if (localMode) {
       root.innerHTML = `<div class="pp-done-screen">
         <h2>${PT.lThanks}</h2>
@@ -5585,7 +5777,7 @@ function showToast(msg) {
       c.reactions[rkey(p.id, m.slideId, m.stmtId)] = { reaction: m.reaction, phrases: '' };
     }
     applyCommitmentAnswer(c, p.id, parsed.commitment);
-    return { ok: true, reason: 'ok' };
+    return { ok: true, reason: 'ok', applied: result.applied.length, skipped: result.skipped.length, usedFallback: !!result.usedFallback };
   }
 
   /* Land one stored response on a participant. Handles BOTH new structured
@@ -5611,7 +5803,7 @@ function showToast(msg) {
         c.reactions[rkey(p.id, m.slideId, m.stmtId)] = { reaction: m.reaction, phrases: '' };
       }
       applyCommitmentAnswer(c, p.id, parsed.commitment);
-      return { ok: true, reason: 'ok' };
+      return { ok: true, reason: 'ok', applied: result.applied.length, skipped: result.skipped.length, usedFallback: !!result.usedFallback };
     }
     // Legacy code-based row.
     return importOneCode(codeFromRow({ payload: pl }), name);
@@ -5651,12 +5843,12 @@ function showToast(msg) {
       return;
     }
     if (!c.importedResponseIds) c.importedResponseIds = [];
-    var added = 0, unreadable = 0, already = 0, reasons = {};
+    var added = 0, unreadable = 0, already = 0, reasons = {}, partialReactions = 0, fallbackRows = 0;
     for (var i = 0; i < rows.length; i++) {
       var row = rows[i];
       if (c.importedResponseIds.indexOf(row.id) >= 0) { already++; continue; }
       var rr = importResponsePayload(row.payload, row.name || '');
-      if (rr.ok) { c.importedResponseIds.push(row.id); added++; }
+      if (rr.ok) { c.importedResponseIds.push(row.id); added++; partialReactions += (rr.skipped || 0); if (rr.usedFallback) fallbackRows++; }
       else {
         unreadable++; reasons[rr.reason] = (reasons[rr.reason] || 0) + 1;   // don't mark imported -> recoverable
         try { console.warn('[Reactioner] response import failed — reason:', rr.reason, '| payload type:', (typeof (row.payload))); } catch (e) {}
@@ -5673,10 +5865,13 @@ function showToast(msg) {
       if (reasons.parse) return 'the stored data wasn’t a valid reaction code';
       return 'the response data couldn’t be read';
     }
-    if (added) setS('✓ Pulled ' + added + ' new response' + (added > 1 ? 's' : '') + ' — open the 🔥 Results tab to see them.' + (unreadable ? (' ' + unreadable + ' skipped (' + reasonMsg() + ').') : ''));
+    var partialMsg = '';
+    if (partialReactions > 0) partialMsg = ' ⚠ ' + partialReactions + ' reaction' + (partialReactions > 1 ? 's' : '') + ' couldn’t be placed on the current slides (the slides likely changed after the link was sent) — open the 🔥 Results heatmap and re-add any blanks manually.';
+    else if (fallbackRows > 0) partialMsg = ' ⚠ Some reactions were matched by position because the slides changed since the link was sent — double-check the heatmap.';
+    if (added) setS('✓ Pulled ' + added + ' new response' + (added > 1 ? 's' : '') + ' — open the 🔥 Results tab to see them.' + (unreadable ? (' ' + unreadable + ' skipped (' + reasonMsg() + ').') : '') + partialMsg);
     else if (unreadable) setS(unreadable + ' response' + (unreadable > 1 ? 's' : '') + ' couldn’t be imported — ' + reasonMsg() + '. (You can also paste their code in the box below.)');
     else setS(already ? ('No new responses (' + already + ' already imported).') : 'No responses yet.');
-    showToast(added ? ('Imported ' + added + ' response' + (added > 1 ? 's' : '')) : (unreadable ? (unreadable + ' couldn’t be imported') : 'No new responses'));
+    showToast(added ? ('Imported ' + added + ' response' + (added > 1 ? 's' : '') + (partialReactions > 0 ? ' — ' + partialReactions + ' couldn’t be placed' : '')) : (unreadable ? (unreadable + ' couldn’t be imported') : 'No new responses'));
   }
 
   function wireCollect(panel) {
@@ -5829,6 +6024,9 @@ function showToast(msg) {
     var o = document.getElementById('inperson-overlay');
     if (o) o.remove();
     document.body.style.overflow = '';
+    // Force the latest reactions to the cloud immediately so a second device
+    // opened seconds later sees them (falls back to local + debounce if offline).
+    if (typeof flushCloudSave === 'function') flushCloudSave();
   }
 
   window.openInPersonReaction = function (pid) {
@@ -5990,12 +6188,18 @@ function showToast(msg) {
       overlay.querySelectorAll('[data-cr]').forEach(function (btn) {
         btn.addEventListener('click', function () { setCommitment(ans.answer, btn.getAttribute('data-cr')); renderCommitment(); });
       });
+      // Set the arrow labels via textContent to bypass a legacy mojibaked
+      // glyph baked into this button markup — renders clean "← Previous" / "Done →".
+      var _ipcPrev = overlay.querySelector('#ip-commit-prev'); if (_ipcPrev) _ipcPrev.textContent = '← Previous';
+      var _ipcNext = overlay.querySelector('#ip-commit-next'); if (_ipcNext) _ipcNext.textContent = 'Done →';
       overlay.querySelector('#ip-commit-prev').addEventListener('click', function () { idx = Math.max(0, c.slides.length - 1); render(); overlay.scrollTo({ top: 0 }); });
       overlay.querySelector('#ip-commit-next').addEventListener('click', function () { if (hasCommitmentAnswer(commitmentDraft)) renderDone(); });
     }
 
     function renderDone() {
       if (typeof save === 'function') save();
+      // Participant finished — push to cloud now so other devices see it.
+      if (typeof flushCloudSave === 'function') flushCloudSave();
       var counts = { love: 0, like: 0, dislike: 0 }, total = 0;
       Object.keys(c.reactions).forEach(function (k) {
         if (k.indexOf(pid + '|') === 0) {
@@ -6003,10 +6207,22 @@ function showToast(msg) {
           if (rr && counts[rr] != null) { counts[rr]++; total++; }
         }
       });
+      // Total reactable lines across every slide (headline + each non-empty
+      // statement) so we can flag if the interviewee left lines blank — partial
+      // capture is surfaced at hand-back instead of silently showing dashes.
+      var totalItems = 0;
+      c.slides.forEach(function (sl) {
+        totalItems++;
+        (sl.statements || []).forEach(function (st) { if (st.text && st.text.trim()) totalItems++; });
+      });
+      var partialNote = (total < totalItems)
+        ? '<p style="font-size:13px;color:var(--muted);margin-top:2px">That’s <strong>' + total + ' of ' + totalItems + '</strong> lines — the rest were left blank. If that’s unexpected, tap <strong>Change a reaction</strong> to fill them in before handing back.</p>'
+        : '';
       overlay.innerHTML = header()
         + '<div class="ip-body"><div class="pp-done-screen">'
         + '<h2>✓ Saved' + (p.name ? ' — ' + esc(p.name) : '') + '!</h2>'
         + '<p style="color:var(--muted)">' + total + ' reaction' + (total === 1 ? '' : 's') + ' recorded in slot <strong>' + esc(p.label) + '</strong>.</p>'
+        + partialNote
         + '<div style="font-size:24px;margin:12px 0">'
         + (counts.love ? '❤️ ' + counts.love + '&nbsp;&nbsp;' : '')
         + (counts.like ? '👍 ' + counts.like + '&nbsp;&nbsp;' : '')
