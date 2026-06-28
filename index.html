@@ -1490,6 +1490,7 @@ body.notes-expanded-lock { overflow: hidden; }
         <h3 style="margin:0">Your slides</h3>
         <div style="display:flex;gap:6px;flex-wrap:wrap">
           <button class="btn" id="copy-from-cycle">Copy from another cycle…</button>
+          <button class="btn" id="download-mvs-pdf">📄 Download MVS slides</button>
           <button class="btn primary" id="add-slide">+ Add a slide</button>
         </div>
       </div>
@@ -3246,8 +3247,8 @@ function buildHeatmapPdfDoc(c, ppsToShow, filterPp) {
 }
 
 /* Open the structured PDF document in a new window and trigger print/save. */
-function openHeatmapPdf(c, ppsToShow, filterPp) {
-  const html = buildHeatmapPdfDoc(c, ppsToShow, filterPp);
+/* Shared: write a full HTML document into a new window and trigger print/save. */
+function printDocInNewWindow(html) {
   const w = window.open('', '_blank');
   if (!w) { showToast('Allow pop-ups for this site to download the PDF.'); return; }
   w.document.open();
@@ -3257,6 +3258,67 @@ function openHeatmapPdf(c, ppsToShow, filterPp) {
   if (w.document.readyState === 'complete') setTimeout(go, 300);
   else w.onload = () => setTimeout(go, 300);
 }
+function openHeatmapPdf(c, ppsToShow, filterPp) {
+  printDocInNewWindow(buildHeatmapPdfDoc(c, ppsToShow, filterPp));
+}
+
+/* Build the Minimal Viable Slides deck as a print-ready landscape document —
+   one page per slide, each rendered in that slide's own Reactioner accent
+   colour, matching the standard MVS layout (title, pain quote, promise,
+   Solution Features / Benefits, Price, and the reaction-key legend). */
+function buildSlidesPdfDoc(c) {
+  const esc = escapeHtml;
+  const slideHtml = (slide) => {
+    const ac = slide.color || '#444444';
+    const quotes = [], promises = [], feats = [], prices = [];
+    (slide.statements || []).forEach(st => {
+      const t = (st.text || '').trim();
+      if (!t) return;
+      if (st.type === 'quote') quotes.push(t);
+      else if (st.type === 'promise') promises.push(t);
+      else if (st.type === 'price') prices.push(t);
+      else feats.push(t); // feature / custom / statement
+    });
+    let h = '<section class="mvs-slide" style="--ac:' + esc(ac) + '">';
+    h += '<h1 class="mvs-title">' + esc(slide.headline || '') + '</h1>';
+    quotes.forEach(q => { const qq = /^["“]/.test(q) ? q : '"' + q + '"'; h += '<div class="mvs-quote">' + esc(qq) + '</div>'; });
+    promises.forEach(p => { h += '<div class="mvs-promise">' + esc(p) + '</div>'; });
+    if (feats.length) {
+      h += '<div class="mvs-feat-label">Solution Features / Benefits:</div><ul class="mvs-feats">';
+      feats.forEach(f => { h += '<li>' + esc(f) + '</li>'; });
+      h += '</ul>';
+    }
+    prices.forEach(pr => { h += '<div class="mvs-price"><span class="mvs-price-label">Price:</span> ' + esc(pr) + '</div>'; });
+    h += '<div class="mvs-legend"><div class="mvs-legend-h">Use these (copy and paste as many as needed):</div>'
+      + '<div>&#10084;&#65039; = super positive</div><div>&#128077; = positive</div><div>&#128078; = negative</div></div>';
+    h += '</section>';
+    return h;
+  };
+  const css =
+    '@page { size: landscape; margin: 0; }'
+    + '* { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }'
+    + 'html, body { margin: 0; padding: 0; }'
+    + 'body { font-family: Arial, Helvetica, "Segoe UI", sans-serif; color: #1a1a1a; }'
+    + '.mvs-slide { position: relative; width: 100%; min-height: 100vh; background: #ededed; padding: 7vh 6vw 6vh; page-break-after: always; }'
+    + '.mvs-slide:last-child { page-break-after: auto; }'
+    + '.mvs-title { color: var(--ac); font-size: 30pt; font-weight: 800; margin: 0 0 20pt; line-height: 1.1; }'
+    + '.mvs-quote { color: var(--ac); font-size: 25pt; font-weight: 800; margin: 0 0 10pt; max-width: 80%; line-height: 1.18; }'
+    + '.mvs-promise { color: var(--ac); font-style: italic; font-weight: 700; font-size: 14pt; margin: 0 0 20pt; max-width: 80%; line-height: 1.35; }'
+    + '.mvs-feat-label { color: var(--ac); font-weight: 700; font-size: 13pt; margin: 0 0 8pt; }'
+    + '.mvs-feats { margin: 0 0 18pt 24pt; padding: 0; color: #1a1a1a; font-size: 13pt; max-width: 78%; }'
+    + '.mvs-feats li { margin: 0 0 7pt; line-height: 1.3; }'
+    + '.mvs-price { font-size: 13pt; color: #1a1a1a; }'
+    + '.mvs-price-label { color: var(--ac); font-weight: 700; }'
+    + '.mvs-legend { position: absolute; right: 6vw; bottom: 6vh; font-size: 13pt; color: #1a1a1a; line-height: 1.5; }'
+    + '.mvs-legend-h { font-weight: 700; max-width: 230pt; margin-bottom: 2pt; }';
+  const slides = c.slides || [];
+  const body = slides.length
+    ? slides.map(slideHtml).join('')
+    : '<section class="mvs-slide"><h1 class="mvs-title">No slides yet</h1></section>';
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(c.name || 'MVS') + ' — Slides</title><style>' + css + '</style></head><body>' + body + '</body></html>';
+}
+function openMvsSlidesPdf(c) { printDocInNewWindow(buildSlidesPdfDoc(c)); }
+document.getElementById('download-mvs-pdf').addEventListener('click', () => { openMvsSlidesPdf(activeCycle()); });
 
 /* ---- SHARE TAB ---- */
 const isLocalFile = window.location.protocol === 'file:';
