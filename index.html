@@ -1139,6 +1139,16 @@
 .pp-auto-status.ok { background:var(--like-bg); border-color:var(--like-c); color:var(--like-c); }
 .pp-auto-status.err { background:var(--dis-bg); border-color:var(--dis-c); color:var(--dis-c); }
 
+#interview-notes-panel .field-label { font-size: 13px; }
+#interview-notes {
+  width: 100%; min-height: 120px; resize: vertical;
+  padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--surface); color: var(--text);
+  font-family: inherit; font-size: 14px; line-height: 1.5; box-sizing: border-box;
+}
+#interview-notes::placeholder { color: var(--muted); }
+#interview-notes:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
 /* ============================================================
    MOBILE FOUNDATION — Phase M0 (phone ≤ 639px)
    Top tab row becomes a fixed bottom nav; safe-area insets;
@@ -1332,6 +1342,11 @@
       <div class="legend" id="heatmap-legend"></div>
       <div id="commitment-results"></div>
       <div class="print-notes" id="print-notes"></div>
+    </div>
+    <div class="panel" id="interview-notes-panel" style="margin-top:14px">
+      <label class="field-label" for="interview-notes">📝 Interview notes</label>
+      <p style="font-size:12px;color:var(--muted);margin:2px 0 8px">Private notes for this whole cycle — context, takeaways, follow-ups. Saved automatically and synced across your devices.</p>
+      <textarea id="interview-notes" placeholder="Jot down anything from this interview…"></textarea>
     </div>
   </div>
 
@@ -2134,7 +2149,34 @@ function normalizeCycleShape(c) {
   if (!c || typeof c !== 'object') return c;
   c.commitmentTest = normalizeCommitmentTest(c.commitmentTest);
   if (!c.commitments || typeof c.commitments !== 'object' || Array.isArray(c.commitments)) c.commitments = {};
+  if (typeof c.interviewNotes !== 'string') c.interviewNotes = '';
+  migrateSlideNotesToCycle(c);
   return c;
+}
+/* One-time, idempotent migration: if any slide carries legacy per-slide
+   `notes`/`keywords` (from an older build or imported data), fold that text
+   into the cycle-level interview notes — clearly labeled by slide — then strip
+   the per-slide fields so nothing is lost and the fields are gone for good.
+   Deleting the source props makes this a no-op on every subsequent load. */
+function migrateSlideNotesToCycle(c) {
+  if (!c || !Array.isArray(c.slides)) return;
+  var migrated = [];
+  c.slides.forEach(function (s) {
+    if (!s || typeof s !== 'object') return;
+    var parts = [];
+    if (typeof s.notes === 'string' && s.notes.trim()) parts.push('Notes: ' + s.notes.trim());
+    if (typeof s.keywords === 'string' && s.keywords.trim()) parts.push('Keywords: ' + s.keywords.trim());
+    else if (Array.isArray(s.keywords) && s.keywords.length) parts.push('Keywords: ' + s.keywords.join(', '));
+    if (parts.length) migrated.push('[' + (s.headline || 'Slide') + '] ' + parts.join(' · '));
+    delete s.notes;
+    delete s.keywords;
+  });
+  if (migrated.length) {
+    var block = 'Migrated from slide notes:\n' + migrated.join('\n');
+    c.interviewNotes = (c.interviewNotes && c.interviewNotes.trim())
+      ? (c.interviewNotes.trim() + '\n\n' + block)
+      : block;
+  }
 }
 function normalizeStateShape(s) {
   if (s && Array.isArray(s.cycles)) s.cycles.forEach(normalizeCycleShape);
@@ -2729,6 +2771,26 @@ function renderHeatmap() {
   renderPdfFilterDropdown();
   renderHeatmapSummary();
   renderCommitmentResults();
+  renderInterviewNotes();
+}
+
+/* Cycle-level interview notes shown beneath the heatmap. Reflects the active
+   cycle's notes and saves edits through the normal local+cloud save() path.
+   The input handler reads activeCycle() live, so switching cycles writes to
+   the right one (per-cycle isolation). */
+function renderInterviewNotes() {
+  const el = document.getElementById('interview-notes');
+  if (!el) return;
+  const c = activeCycle();
+  const val = (c && typeof c.interviewNotes === 'string') ? c.interviewNotes : '';
+  if (el.value !== val) el.value = val;
+  if (!el._wired) {
+    el._wired = true;
+    el.addEventListener('input', () => {
+      const cc = activeCycle();
+      if (cc) { cc.interviewNotes = el.value; save(); }
+    });
+  }
 }
 
 /* Plain-language read-out of the heatmap so a non-technical founder
